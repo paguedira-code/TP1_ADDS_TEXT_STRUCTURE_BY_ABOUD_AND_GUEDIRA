@@ -58,13 +58,11 @@ struct PosRBTNode
 typedef struct
 {
    AlphaRBTNode *root;
-   AlphaRBTNode *nil; /* sentinel node */
 } AlphaRBT;
 
 typedef struct
 {
    PosRBTNode *root;
-   PosRBTNode *nil; /* sentinel node */
 } PosRBT;
 
 /* ============================================================
