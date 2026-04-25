@@ -3,19 +3,66 @@
 #include <string.h>
 #include "structures.h"
 //NIL definition for RBTs:
-AlphaRBTNode ALPHA_NIL = { NULL, NULL, 1, &ALPHA_NIL, &ALPHA_NIL, &ALPHA_NIL };
-PosRBTNode   POS_NIL   = { NULL,    NULL, 1, &POS_NIL,   &POS_NIL,   &POS_NIL   };
-
-Rose *AllocateRose()
-{
-    Rose *R = malloc(sizeof(Rose));
-    R->head = NULL;
-    R->tail = NULL;
-    R->size = 0;
-    return R;
+AlphaRBTNode ALPHA_NIL = { NULL, NULL, 0, &ALPHA_NIL, &ALPHA_NIL, &ALPHA_NIL };
+PosRBTNode   POS_NIL   = { NULL,    NULL, 0, &POS_NIL,   &POS_NIL,   &POS_NIL   };
+//pos_list_functions:
+PosNode* poslist_create_node(PosRBTNode* pos_ref) {
+    PosNode* new = malloc(sizeof(PosNode));
+    if (new == NULL) {
+        printf("ERROR allocation of PosNode\n");
+        return NULL;
+    }
+    new->pos_ref = pos_ref;
+    new->next    = new;
+    new->prev    = new;
+    return new;
 }
-char *seperate_words(char **str, int *newpara)
-{
+void poslist_insert(PosNode** head, PosRBTNode* pos_ref) {
+    PosNode* new = poslist_create_node(pos_ref);
+    if (*head == NULL) {
+        *head = new;
+    } else {
+        PosNode* last = (*head)->prev;
+        last->next    = new;
+        new->prev     = last;
+        new->next     = *head;
+        (*head)->prev = new;
+    }
+}
+void poslist_free(PosNode* head) {
+    if (head == NULL){
+        return;
+    }
+    PosNode* cur = head;
+    do {
+        PosNode* tmp = cur;
+        cur          = cur->next;
+        free(tmp);
+    } while (cur != head);
+}
+PosNode* poslist_copy(PosNode* head) {
+    if (head == NULL) return NULL;
+    PosNode* result = NULL;
+    PosNode* cur    = head;
+    do {
+        poslist_insert(&result, cur->pos_ref);
+        cur = cur->next;
+    } while (cur != head);
+    return result;
+}
+void poslist_print(PosNode* head) {
+    if (head == NULL) { printf("[]"); return; }
+    printf("[");
+    PosNode* cur = head;
+    do {
+        printf("%d", cur->pos_ref->position);
+        if (cur->next != head) printf(" <-> ");
+        cur = cur->next;
+    } while (cur != head);
+    printf("]");
+}
+
+char *seperate_words(char **str, int *newpara){
     if ((str == NULL) || (*str == NULL) || (**str == '\0'))
     {
         return NULL;
@@ -61,58 +108,42 @@ char *seperate_words(char **str, int *newpara)
     }
     return start;
 }
-PosNode *allocatePosNode()
-{
-    PosNode *P = malloc(sizeof(PosNode));
-    P->next = P;
-    P->prev = P;
-    return P;
-}
-AlphaRBT *AlocateAlphaRBT()
-{
+
+//RBTs_functions:
+AlphaRBT *AlocateAlphaRBT(){
     AlphaRBT *tree = malloc(sizeof(AlphaRBT));
     tree->root = &ALPHA_NIL;
     return tree;
 }
-PosRBT *AlocatePosRBT()
-{
+
+PosRBT *AlocatePosRBT(){
     PosRBT *tree = malloc(sizeof(PosRBT));
     tree->root = &POS_NIL;
+    tree->max = &POS_NIL;
     return tree;
 }
-PetalNode *allocatePetalNode()
-{
-    PetalNode *Petal = malloc(sizeof(PetalNode));
-    Petal->alpha_tree = NULL;
-    Petal->pos_tree = NULL;
-    Petal->next = Petal;
-    Petal->prev = Petal;
-    return Petal;
-}
-AlphaRBTNode *allocateAlphaRBTNode(AlphaRBT *RBT)
-{
+
+AlphaRBTNode *allocateAlphaRBTNode(AlphaRBT *RBT){
     AlphaRBTNode *P = malloc(sizeof(AlphaRBTNode));
-    if (P == NULL)
-    {
+    if (P == NULL){
         printf("failed alocation");
         return &ALPHA_NIL;
     }
+    P->color = RED;
     P->parent = &ALPHA_NIL;
     P->left = &ALPHA_NIL;
     P->right = &ALPHA_NIL;
-    P->pos_list_head = NULL;
-    P->pos_list_tail = NULL;
+    P->pos_list = NULL;
     return P;
 }
 
-PosRBTNode *allocatePosRBTNode(PosRBT *RBT)
-{
+PosRBTNode *allocatePosRBTNode(PosRBT *RBT){
     PosRBTNode *P = malloc(sizeof(PosRBTNode));
-    if (P == NULL)
-    {
+    if (P == NULL){
         printf("failed alocation");
         return &POS_NIL;
     }
+    P->color = RED;
     P->parent = &POS_NIL;
     P->left = &POS_NIL;
     P->right = &POS_NIL;
@@ -285,8 +316,7 @@ void AlphaRBTfix(AlphaRBT *RBT, AlphaRBTNode *P)
     RBT->root->color = BLACK;
 }
 
-void PosRBTfix(PosRBT *RBT, PosRBTNode *P)
-{
+void PosRBTfix(PosRBT *RBT, PosRBTNode *P){
     PosRBTNode *unc;
     PosRBTNode *gp;
     while ((P->parent != &POS_NIL) && (P->parent->color == RED))
@@ -363,7 +393,6 @@ AlphaRBTNode *Insert_AlphaRBT(AlphaRBT *RBT, char *word){
 
     AlphaRBTNode *P = allocateAlphaRBTNode(RBT);
     P->word = strdup(word);
-    P->color = RED;
     P->parent = parent;
 
     if (parent == &ALPHA_NIL)
@@ -385,66 +414,83 @@ AlphaRBTNode *Insert_AlphaRBT(AlphaRBT *RBT, char *word){
     return P;
 }
 
-PosRBTNode *Insert_PosRBT(PosRBT *RBT)
-{
-    PosRBTNode *node = RBT->root;
-    PosRBTNode *parent = &POS_NIL;
-    PosRBTNode *P = allocatePosRBTNode(RBT);
-    P->color = RED;
+PosRBTNode* Insert_PosRBT(PosRBT* RBT) {
+    PosRBTNode* P = allocatePosRBTNode(RBT);
+    P->parent     = RBT->max; 
 
-    if (node != &POS_NIL)
-    {
-        while (node->right != &POS_NIL)
-        {
-            node = node->right;
-        }
-        parent = node;
-    }
-
-    P->parent = parent;
-
-    if (parent == &POS_NIL)
-    {
+    if (RBT->max == &POS_NIL) {
         P->position = 1;
-        RBT->root = P;
+        RBT->root   = P;
+    } else {
+        P->position      = RBT->max->position + 1;
+        RBT->max->right  = P;
     }
-    else
-    {
-        P->position = parent->position + 1;
-        parent->right = P;
-    }
+
     PosRBTfix(RBT, P);
+    RBT->max = P;  
     return P;
 }
 
-void Insert_word(PetalNode *P, char *word)
-{
-    if (P->pos_tree == NULL || P->alpha_tree == NULL)
+void Print_PosRBT(PosRBT *RBT, PosRBTNode *node){
+    // Base case: Stop when we hit the sentinel 'nil' node
+    if (node != &POS_NIL)
     {
-        P->pos_tree = AlocatePosRBT();
-        P->alpha_tree = AlocateAlphaRBT();
-    }
-    AlphaRBTNode *alphanode = Insert_AlphaRBT(P->alpha_tree, word);
-    PosRBTNode *posnode = Insert_PosRBT(P->pos_tree);
-    posnode->word_ref = alphanode;
-    PosNode *node = allocatePosNode();
-    node->pos_ref = posnode;
-    if (alphanode->pos_list_head == NULL)
-    {
-        alphanode->pos_list_head = node;
-        alphanode->pos_list_tail = node;
-    }
-    else
-    {
-        alphanode->pos_list_tail->next = node;
-        node->prev = alphanode->pos_list_tail;
-        node->next = alphanode->pos_list_head;
-        alphanode->pos_list_head->prev = node;
-        alphanode->pos_list_tail = node;
+        Print_PosRBT(RBT, node->left);
+
+        // Print the word by following the pointer to the Alpha tree!
+        printf("%s ", node->word_ref->word);
+
+        Print_PosRBT(RBT, node->right);
     }
 }
-Rose *Text_to_Rose(char *Text)
+
+void Print_AlphaRBT(AlphaRBTNode* node) {
+    if (node == &ALPHA_NIL){
+        return;
+    }
+    Print_AlphaRBT(node->left);
+
+    printf("  - %s (Appears at positions: ", node->word);
+    PosNode* cur = node->pos_list;
+    if (cur != NULL) {
+        do {
+            printf("%d", cur->pos_ref->position);
+            cur = cur->next;
+            if (cur != node->pos_list) printf(", ");
+        } while (cur != node->pos_list);
+    }
+    printf(")\n");
+
+    Print_AlphaRBT(node->right);
+}
+
+//petal_functions:
+PetalNode *allocatePetalNode()
 {
+    PetalNode *Petal = malloc(sizeof(PetalNode));
+    Petal->alpha_tree = NULL;
+    Petal->pos_tree = NULL;
+    Petal->next = Petal;
+    Petal->prev = Petal;
+    return Petal;
+}
+
+void Insert_word(PetalNode* P, char* word) {
+    AlphaRBTNode* alphanode  = Insert_AlphaRBT(P->alpha_tree, word);
+    PosRBTNode*   posnode    = Insert_PosRBT(P->pos_tree);
+    posnode->word_ref        = alphanode;
+    poslist_insert(&alphanode->pos_list, posnode);
+}
+
+//Rose_fucntions:
+Rose *AllocateRose(){
+    Rose *R = malloc(sizeof(Rose));
+    R->head = NULL;
+    R->tail = NULL;
+    R->size = 0;
+    return R;
+}
+Rose *Text_to_Rose(char *Text){
     if (Text == NULL)
         return NULL;
 
@@ -496,51 +542,10 @@ Rose *Text_to_Rose(char *Text)
 // ==========================================
 // 1. Traverse the Positional Tree (Reconstructs Paragraph)
 // ==========================================
-void Print_PosRBT(PosRBT *RBT, PosRBTNode *node)
-{
-    // Base case: Stop when we hit the sentinel 'nil' node
-    if (node != &POS_NIL)
-    {
-        Print_PosRBT(RBT, node->left);
-
-        // Print the word by following the pointer to the Alpha tree!
-        printf("%s ", node->word_ref->word);
-
-        Print_PosRBT(RBT, node->right);
-    }
-}
 
 // ==========================================
 // 2. Traverse the Alphabetical Tree & DLL
 // ==========================================
-void Print_AlphaRBT(AlphaRBT *RBT, AlphaRBTNode *node)
-{
-    if (node != &ALPHA_NIL)
-    {
-        Print_AlphaRBT(RBT, node->left);
-
-        // Print the alphabetically sorted word
-        printf("  - %s (Appears at positions: ", node->word);
-
-        // Loop through the Circular Doubly Linked List of positions
-        PosNode *curr = node->pos_list_head;
-        if (curr != NULL)
-        {
-            do
-            {
-                printf("%d", curr->pos_ref->position);
-                curr = curr->next;
-                if (curr != node->pos_list_head)
-                {
-                    printf(", ");
-                }
-            } while (curr != node->pos_list_head);
-        }
-        printf(")\n");
-
-        Print_AlphaRBT(RBT, node->right);
-    }
-}
 
 // ==========================================
 // 3. Traverse a Single Petal
@@ -561,7 +566,7 @@ void Print_Petal(PetalNode *P, int petal_number)
     printf("\n[Alphabetical Index from Alpha Tree]:\n");
     if (P->alpha_tree != NULL)
     {
-        Print_AlphaRBT(P->alpha_tree, P->alpha_tree->root);
+        Print_AlphaRBT(P->alpha_tree->root);
     }
 }
 
