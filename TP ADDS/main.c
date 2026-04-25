@@ -2,6 +2,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include "structures.h"
+//NIL definition for RBTs:
+AlphaRBTNode ALPHA_NIL = { NULL, NULL, 1, &ALPHA_NIL, &ALPHA_NIL, &ALPHA_NIL };
+PosRBTNode   POS_NIL   = { NULL,    NULL, 1, &POS_NIL,   &POS_NIL,   &POS_NIL   };
 
 Rose *AllocateRose()
 {
@@ -68,17 +71,13 @@ PosNode *allocatePosNode()
 AlphaRBT *AlocateAlphaRBT()
 {
     AlphaRBT *tree = malloc(sizeof(AlphaRBT));
-    tree->nil = malloc(sizeof(AlphaRBTNode));
-    tree->nil->color = BLACK;
-    tree->root = tree->nil;
+    tree->root = &ALPHA_NIL;
     return tree;
 }
 PosRBT *AlocatePosRBT()
 {
     PosRBT *tree = malloc(sizeof(PosRBT));
-    tree->nil = malloc(sizeof(PosRBTNode));
-    tree->nil->color = BLACK;
-    tree->root = tree->nil;
+    tree->root = &POS_NIL;
     return tree;
 }
 PetalNode *allocatePetalNode()
@@ -90,18 +89,17 @@ PetalNode *allocatePetalNode()
     Petal->prev = Petal;
     return Petal;
 }
-
 AlphaRBTNode *allocateAlphaRBTNode(AlphaRBT *RBT)
 {
     AlphaRBTNode *P = malloc(sizeof(AlphaRBTNode));
     if (P == NULL)
     {
         printf("failed alocation");
-        return RBT->nil;
+        return &ALPHA_NIL;
     }
-    P->parent = RBT->nil;
-    P->left = RBT->nil;
-    P->right = RBT->nil;
+    P->parent = &ALPHA_NIL;
+    P->left = &ALPHA_NIL;
+    P->right = &ALPHA_NIL;
     P->pos_list_head = NULL;
     P->pos_list_tail = NULL;
     return P;
@@ -113,11 +111,11 @@ PosRBTNode *allocatePosRBTNode(PosRBT *RBT)
     if (P == NULL)
     {
         printf("failed alocation");
-        return RBT->nil;
+        return &POS_NIL;
     }
-    P->parent = RBT->nil;
-    P->left = RBT->nil;
-    P->right = RBT->nil;
+    P->parent = &POS_NIL;
+    P->left = &POS_NIL;
+    P->right = &POS_NIL;
     return P;
 }
 
@@ -125,13 +123,12 @@ void AlphaRBTRightRot(AlphaRBT *RBT, AlphaRBTNode *y)
 {
     AlphaRBTNode *x = y->left;
     y->left = x->right;
-    if (x->right != RBT->nil)
+    if (x->right != &ALPHA_NIL)
     {
         x->right->parent = y;
     }
     x->parent = y->parent;
-    if (y->parent == RBT->nil)
-    {
+    if (y->parent == &ALPHA_NIL){
         RBT->root = x;
     }
     else
@@ -153,12 +150,12 @@ void AlphaRBTLeftRot(AlphaRBT *RBT, AlphaRBTNode *y)
 {
     AlphaRBTNode *x = y->right;
     y->right = x->left;
-    if (x->left != RBT->nil)
+    if (x->left != &ALPHA_NIL)
     {
         x->left->parent = y;
     }
     x->parent = y->parent;
-    if (y->parent == RBT->nil)
+    if (y->parent == &ALPHA_NIL)
     {
         RBT->root = x;
     }
@@ -181,12 +178,12 @@ void PosRBTRightRot(PosRBT *RBT, PosRBTNode *y)
 {
     PosRBTNode *x = y->left;
     y->left = x->right;
-    if (x->right != RBT->nil)
+    if (x->right != &POS_NIL)
     {
         x->right->parent = y;
     }
     x->parent = y->parent;
-    if (y->parent == RBT->nil)
+    if (y->parent == &POS_NIL)
     {
         RBT->root = x;
     }
@@ -209,12 +206,12 @@ void PosRBTLeftRot(PosRBT *RBT, PosRBTNode *y)
 {
     PosRBTNode *x = y->right;
     y->right = x->left;
-    if (x->left != RBT->nil)
+    if (x->left != &POS_NIL)
     {
         x->left->parent = y;
     }
     x->parent = y->parent;
-    if (y->parent == RBT->nil)
+    if (y->parent == &POS_NIL)
     {
         RBT->root = x;
     }
@@ -235,9 +232,9 @@ void PosRBTLeftRot(PosRBT *RBT, PosRBTNode *y)
 
 void AlphaRBTfix(AlphaRBT *RBT, AlphaRBTNode *P)
 {
-    AlphaRBTNode *unc;
-    AlphaRBTNode *gp;
-    while ((P->parent != RBT->nil) && (P->parent->color == RED))
+    AlphaRBTNode *unc = &ALPHA_NIL;
+    AlphaRBTNode *gp = &ALPHA_NIL;
+    while ((P->parent != &ALPHA_NIL) && (P->parent->color == RED))
     {
         gp = P->parent->parent;
         if (P->parent == gp->left)
@@ -292,7 +289,7 @@ void PosRBTfix(PosRBT *RBT, PosRBTNode *P)
 {
     PosRBTNode *unc;
     PosRBTNode *gp;
-    while ((P->parent != RBT->nil) && (P->parent->color == RED))
+    while ((P->parent != &POS_NIL) && (P->parent->color == RED))
     {
         gp = P->parent->parent;
         if (P->parent == gp->left)
@@ -343,11 +340,10 @@ void PosRBTfix(PosRBT *RBT, PosRBTNode *P)
     RBT->root->color = BLACK;
 }
 
-AlphaRBTNode *Insert_AlphaRBT(AlphaRBT *RBT, char *word)
-{
-    AlphaRBTNode *parent = RBT->nil;
+AlphaRBTNode *Insert_AlphaRBT(AlphaRBT *RBT, char *word){
+    AlphaRBTNode *parent = &ALPHA_NIL;
     AlphaRBTNode *node = RBT->root;
-    while (node != RBT->nil && strcmp(word, node->word) != 0)
+    while (node != &ALPHA_NIL && strcmp(word, node->word) != 0)
     {
         parent = node;
         if (strcmp(word, node->word) < 0)
@@ -360,7 +356,7 @@ AlphaRBTNode *Insert_AlphaRBT(AlphaRBT *RBT, char *word)
         }
     }
 
-    if (node != RBT->nil)
+    if (node != &ALPHA_NIL)
     {
         return node;
     }
@@ -370,7 +366,7 @@ AlphaRBTNode *Insert_AlphaRBT(AlphaRBT *RBT, char *word)
     P->color = RED;
     P->parent = parent;
 
-    if (parent == RBT->nil)
+    if (parent == &ALPHA_NIL)
     {
         RBT->root = P;
     }
@@ -392,13 +388,13 @@ AlphaRBTNode *Insert_AlphaRBT(AlphaRBT *RBT, char *word)
 PosRBTNode *Insert_PosRBT(PosRBT *RBT)
 {
     PosRBTNode *node = RBT->root;
-    PosRBTNode *parent = RBT->nil;
+    PosRBTNode *parent = &POS_NIL;
     PosRBTNode *P = allocatePosRBTNode(RBT);
     P->color = RED;
 
-    if (node != RBT->nil)
+    if (node != &POS_NIL)
     {
-        while (node->right != RBT->nil)
+        while (node->right != &POS_NIL)
         {
             node = node->right;
         }
@@ -407,7 +403,7 @@ PosRBTNode *Insert_PosRBT(PosRBT *RBT)
 
     P->parent = parent;
 
-    if (parent == RBT->nil)
+    if (parent == &POS_NIL)
     {
         P->position = 1;
         RBT->root = P;
@@ -503,7 +499,7 @@ Rose *Text_to_Rose(char *Text)
 void Print_PosRBT(PosRBT *RBT, PosRBTNode *node)
 {
     // Base case: Stop when we hit the sentinel 'nil' node
-    if (node != RBT->nil)
+    if (node != &POS_NIL)
     {
         Print_PosRBT(RBT, node->left);
 
@@ -519,7 +515,7 @@ void Print_PosRBT(PosRBT *RBT, PosRBTNode *node)
 // ==========================================
 void Print_AlphaRBT(AlphaRBT *RBT, AlphaRBTNode *node)
 {
-    if (node != RBT->nil)
+    if (node != &ALPHA_NIL)
     {
         Print_AlphaRBT(RBT, node->left);
 
