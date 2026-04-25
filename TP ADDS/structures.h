@@ -31,8 +31,7 @@ struct PosNode
 struct AlphaRBTNode
 {
    char *word; /* heap-allocated string       */
-   PosNode *pos_list_head;
-   PosNode *pos_list_tail; /* DLL of position references  */
+   PosNode *pos_list; /* circular DLL of position references  */
    int color;              /* RED (1) or BLACK (0)        */
    AlphaRBTNode *parent;
    AlphaRBTNode *left;
@@ -63,6 +62,7 @@ typedef struct
 typedef struct
 {
    PosRBTNode *root;
+   PosRBTNode* max;
 } PosRBT;
 
 /* ============================================================
