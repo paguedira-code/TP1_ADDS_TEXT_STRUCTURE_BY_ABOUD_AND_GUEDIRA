@@ -35,6 +35,7 @@ struct AlphaRBTNode{
    AlphaRBTNode *parent;
    AlphaRBTNode *left;
    AlphaRBTNode *right;
+   int rep;
 };
 
 /* ============================================================
