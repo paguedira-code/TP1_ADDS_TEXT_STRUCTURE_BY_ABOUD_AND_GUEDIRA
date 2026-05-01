@@ -28,8 +28,7 @@ struct PosNode
 /* ============================================================
    LAYER 1 — Alpha-RBT Node (word-based)
    ============================================================ */
-struct AlphaRBTNode
-{
+struct AlphaRBTNode{
    char *word; /* heap-allocated string       */
    PosNode *pos_list; /* circular DLL of position references  */
    int color;              /* RED (1) or BLACK (0)        */
@@ -68,8 +67,7 @@ typedef struct
 /* ============================================================
    LAYER 2 — Petal (paragraph)
    ============================================================ */
-struct PetalNode
-{
+struct PetalNode{
    AlphaRBT *alpha_tree; /* word index     */
    PosRBT *pos_tree;     /* position index */
    PetalNode *next;      /* circular list  */
@@ -81,8 +79,7 @@ struct PetalNode
    ============================================================ */
 typedef struct Rose
 {
-   PetalNode *head;
-   PetalNode *tail;
+   PetalNode *petals;
    int size;
 } Rose;
 
