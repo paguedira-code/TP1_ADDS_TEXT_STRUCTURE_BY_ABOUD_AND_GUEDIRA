@@ -47,7 +47,6 @@ PetalNode *intersection_P(PetalNode *pet1, PetalNode *pet2)
         return NULL;
     }
     PetalNode *pet = allocatePetalNode();
-    pet->is_pos = 0;
     AlphaRBTNode *ptr1 = pet1->alpha_tree->root;
     while (ptr1->left != &ALPHA_NIL)
     {
@@ -84,7 +83,6 @@ PetalNode *intersection_P(PetalNode *pet1, PetalNode *pet2)
 PetalNode *union_P(PetalNode *pet1, PetalNode *pet2)
 {
     PetalNode *pet = allocatePetalNode();
-    pet->is_pos = 0;
     AlphaRBTNode *ptr1 = pet1->alpha_tree->root;
     while (ptr1 != &ALPHA_NIL && ptr1->left != &ALPHA_NIL)
     {
@@ -176,7 +174,6 @@ PetalNode *difference(PetalNode *A, PetalNode *B)
     }
     int diff;
     PetalNode *diffAB = allocatePetalNode();
-    diffAB->is_pos = 0;
     while (ptra != NULL)
     {
         diff = strcmp(ptra->word, ptrb->word);
