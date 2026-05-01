@@ -1,0 +1,201 @@
+AlphaRBTNode *search_word(char *word, AlphaRBT *RBT)
+{
+    AlphaRBTNode *ptr = RBT->root;
+    while (ptr != &ALPHA_NIL && strcmp(word, ptr->word) != 0)
+    {
+        if (strcmp(word, ptr->word) < 0)
+        {
+            ptr = ptr->left;
+        }
+        else
+        {
+            ptr = ptr->right;
+        }
+    }
+
+    return ptr;
+    return &ALPHA_NIL;
+}
+
+AlphaRBTNode *nextinorder(AlphaRBTNode *ptr)
+{
+    if (ptr == &ALPHA_NIL)
+    {
+        return &ALPHA_NIL;
+    }
+    if (ptr->right != &ALPHA_NIL)
+    {
+        ptr = ptr->right;
+        while (ptr->left != &ALPHA_NIL)
+        {
+            ptr = ptr->left;
+        }
+        return ptr;
+    }
+
+    while (ptr->parent != &ALPHA_NIL && ptr == ptr->parent->right)
+    {
+        ptr = ptr->parent;
+    }
+    return ptr->parent;
+}
+
+PetalNode *intersection_P(PetalNode *pet1, PetalNode *pet2)
+{
+    if (pet1->alpha_tree->root == &ALPHA_NIL || pet2->alpha_tree->root == &ALPHA_NIL)
+    {
+        return NULL;
+    }
+    PetalNode *pet = allocatePetalNode();
+    pet->is_pos = 0;
+    AlphaRBTNode *ptr1 = pet1->alpha_tree->root;
+    while (ptr1->left != &ALPHA_NIL)
+    {
+        ptr1 = ptr1->left;
+    }
+    AlphaRBTNode *ptr2 = pet2->alpha_tree->root;
+    while (ptr2->left != &ALPHA_NIL)
+    {
+        ptr2 = ptr2->left;
+    }
+    while (ptr1 != &ALPHA_NIL && ptr2 != &ALPHA_NIL)
+    {
+        if (strcmp(ptr1->word, ptr2->word) == 0)
+        {
+            Insert_AlphaRBT(pet, ptr1->word, (ptr1->rep < ptr2->rep) ? ptr1->rep : ptr2->rep);
+            ptr1 = nextinorder(ptr1);
+            ptr2 = nextinorder(ptr2);
+        }
+        else
+        {
+            if (strcmp(ptr1->word, ptr2->word) < 0)
+            {
+                ptr1 = nextinorder(ptr1);
+            }
+            else
+            {
+                ptr2 = nextinorder(ptr2);
+            }
+        }
+    }
+    return pet;
+}
+
+PetalNode *union_P(PetalNode *pet1, PetalNode *pet2)
+{
+    PetalNode *pet = allocatePetalNode();
+    pet->is_pos = 0;
+    AlphaRBTNode *ptr1 = pet1->alpha_tree->root;
+    while (ptr1 != &ALPHA_NIL && ptr1->left != &ALPHA_NIL)
+    {
+        ptr1 = ptr1->left;
+    }
+    AlphaRBTNode *ptr2 = pet2->alpha_tree->root;
+    while (ptr2 != &ALPHA_NIL && ptr2->left != &ALPHA_NIL)
+    {
+        ptr2 = ptr2->left;
+    }
+    while (ptr1 != &ALPHA_NIL && ptr2 != &ALPHA_NIL)
+    {
+        if (strcmp(ptr1->word, ptr2->word) == 0)
+        {
+            Insert_AlphaRBT(pet, ptr1->word, (ptr1->rep > ptr2->rep) ? ptr1->rep : ptr2->rep);
+            ptr1 = nextinorder(ptr1);
+            ptr2 = nextinorder(ptr2);
+        }
+        else
+        {
+            if (strcmp(ptr1->word, ptr2->word) < 0)
+            {
+                Insert_AlphaRBT(pet, ptr1->word, ptr1->rep);
+                ptr1 = nextinorder(ptr1);
+            }
+            else
+            {
+                Insert_AlphaRBT(pet, ptr2->word, ptr2->rep);
+                ptr2 = nextinorder(ptr2);
+            }
+        }
+    }
+    while (ptr1 != &ALPHA_NIL)
+    {
+        Insert_word(pet, ptr1->word, ptr1->rep);
+        ptr1 = nextinorder(ptr1);
+    }
+    while (ptr2 != &ALPHA_NIL)
+    {
+        Insert_word(pet, ptr2->word, ptr2->rep);
+        ptr2 = nextinorder(ptr2);
+    }
+    return pet;
+}
+
+char *file_to_string(const char *filename)
+{
+    FILE *file = fopen(filename, "r");
+    if (file == NULL)
+    {
+        printf("The file %s doesn't exist\n", filename);
+        return NULL;
+    }
+    fseek(file, 0, SEEK_END);
+    long file_size = ftell(file);
+    rewind(file);
+    char *buffer = (char *)malloc(file_size + 1);
+    if (buffer == NULL)
+    {
+        printf("Error: Memory allocation failed\n");
+        fclose(file);
+        return NULL;
+    }
+    size_t bytes_read = fread(buffer, 1, file_size, file);
+    buffer[bytes_read] = '\0';
+    fclose(file);
+    return buffer;
+}
+
+PetalNode *difference(PetalNode *A, PetalNode *B)
+{
+    AlphaRBTNode *ptra = A->alpha_tree->root;
+    AlphaRBTNode *ptrb = B->alpha_tree->root;
+    if (ptra == &ALPHA_NIL)
+    {
+        return NULL;
+    }
+    if (ptrb == &ALPHA_NIL)
+    {
+        return A;
+    }
+    while (ptra->left != &ALPHA_NIL)
+    {
+        ptra = ptra->left;
+    }
+    while (ptrb->left != &ALPHA_NIL)
+    {
+        ptrb = ptrb->left;
+    }
+    int diff;
+    PetalNode *diffAB = allocatePetalNode();
+    diffAB->is_pos = 0;
+    while (ptra != NULL)
+    {
+        diff = strcmp(ptra->word, ptrb->word);
+        if (diff == 0 && ptra->rep > ptrb->rep)
+        {
+            Insert_AlphaRBT(diffAB->alpha_tree, ptra->word, ptra->rep - ptrb->rep);
+            ptra = nextinorder(ptra);
+            ptrb = nextinorder(ptrb);
+        }
+        if (diff < 0)
+        {
+            Insert_AlphaRBT(diffAB->alpha_tree, ptra->word, ptra->rep);
+            ptra = nextinorder(ptra);
+        }
+        if (diff > 0)
+        {
+            ptrb = nextinorder(ptrb);
+        }
+    }
+
+    return diffAB;
+}
