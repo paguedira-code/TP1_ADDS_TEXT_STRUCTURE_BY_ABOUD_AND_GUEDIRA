@@ -134,6 +134,7 @@ AlphaRBTNode *allocateAlphaRBTNode(AlphaRBT *RBT){
     P->left = &ALPHA_NIL;
     P->right = &ALPHA_NIL;
     P->pos_list = NULL;
+    p->rep=0;
     return P;
 }
 
@@ -388,11 +389,13 @@ AlphaRBTNode *Insert_AlphaRBT(AlphaRBT *RBT, char *word){
 
     if (node != &ALPHA_NIL)
     {
+        node->rep++;
         return node;
     }
 
     AlphaRBTNode *P = allocateAlphaRBTNode(RBT);
     P->word = strdup(word);
+    P->rep++;
     P->parent = parent;
 
     if (parent == &ALPHA_NIL)
