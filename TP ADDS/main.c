@@ -481,63 +481,125 @@ void Insert_word(PetalNode* P, char* word) {
     posnode->word_ref        = alphanode;
     poslist_insert(&alphanode->pos_list, posnode);
 }
+//text_processing_functions:
+int is_delimiter(char c) {
+    return (c == ' '  || c == '\t' || c == '\n' ||
+            c == '.'  || c == ','  || c == '?'  ||
+            c == '!'  || c == '"'  || c == '\'' ||
+            c == ';'  || c == ':'  || c == '-');
+}
+
+int is_paragraph_break(char* str, int i) {
+    return (str[i] == '\n' && str[i + 1] == '\n');
+}
+
+int is_end_of_string(char* str, int i) {
+    return (str[i] == '\0');
+}
+
+int skip_delimiters(char* str, int i, int* newpara) {
+    while (str[i] != '\0' && is_delimiter(str[i])) {
+        if (is_paragraph_break(str, i)) *newpara = 1;
+        i++;
+    }
+    return i;
+}
+
+int collect_word(char* str, int i) {
+    while (str[i] != '\0' && !is_delimiter(str[i])) {
+        i++;
+    }
+    return i;
+}
+
+void detect_newpara(char* str, int i, char** next, int* newpara) {
+    if (is_end_of_string(str, i)) {
+        /* last word in the entire text */
+        *newpara = 1;
+        *next    = NULL;
+    } else {
+        *newpara = is_paragraph_break(str, i) ? 1 : 0;
+        str[i]   = '\0';
+        *next    = str + i + 1;
+    }
+}
+
+char* separate_words(char** str, int* newpara) {
+    if (str == NULL || *str == NULL || **str == '\0') return NULL;
+
+    char* cur = *str;
+    int   i   = 0;
+
+    /* Step 1 — skip leading delimiters */
+    i = skip_delimiters(cur, i, newpara);
+
+    /* Step 2 — nothing left after delimiters */
+    if (is_end_of_string(cur, i)) {
+        *str = NULL;
+        return NULL;
+    }
+
+    /* Step 3 — mark start of word */
+    char* start = cur + i;
+
+    /* Step 4 — collect word characters */
+    i = collect_word(cur, i);
+
+    /* Step 5 — detect paragraph break and advance str */
+    detect_newpara(cur, i, str, newpara);
+
+    return start;
+}
 
 //Rose_fucntions:
 Rose *AllocateRose(){
     Rose *R = malloc(sizeof(Rose));
-    R->head = NULL;
-    R->tail = NULL;
+    R->petals = NULL;
     R->size = 0;
     return R;
 }
-Rose *Text_to_Rose(char *Text){
-    if (Text == NULL)
-        return NULL;
 
-    int newpara = 0;
-    Rose *ROSE = AllocateRose();
+void append_petal(Rose* rose){
+    PetalNode* P = allocatePetalNode();
+    if (rose->petals == NULL) {
+        rose->petals = P;
+        P->next      = P;
+        P->prev      = P;
+    } else {
+        PetalNode* tail    = rose->petals->prev;
+        tail->next         = P;
+        P->prev            = tail;
+        P->next            = rose->petals;
+        rose->petals->prev = P;
+    }
+    rose->size++;
+}
 
-    char *copy = strdup(Text);
-    char *tracker = copy; // WE USE A TRACKER SO 'COPY' DOESN'T GET LOST
+Rose* text_to_rose(char* text) {
+    if (text == NULL) return NULL;
 
-    char *word = seperate_words(&tracker, &newpara);
-    PetalNode *P = NULL;
+    Rose* rose    = AllocateRose();
+    char* copy    = strdup(text);
+    char* tracker = copy;
+    int   newpara = 0;
 
-    newpara = 1;
-    while (word != NULL)
-    {
-        if (newpara == 1)
-        {
-            P = allocatePetalNode();
-            if (ROSE->head == NULL)
-            {
-                ROSE->head = P;
-                ROSE->tail = P;
-            }
-            else
-            {
-                ROSE->tail->next = P;
-                P->prev = ROSE->tail;
-                ROSE->head->prev = P;
-                P->next = ROSE->head;
-                ROSE->tail = P;
-            }
-            ROSE->size++;
+    append_petal(rose);                         /* create first petal         */
+    char* word = next_word(&tracker, &newpara); /* fetch first word           */
 
-            Insert_word(P, word);
+    while (word != NULL) {
+        Insert_word(rose->petals->prev, word);  /* insert into current petal  */
+        if (newpara == 1) {                     /* current word was last in   */
+            word = next_word(&tracker, &newpara);/* its paragraph             */
+            if (word != NULL) append_petal(rose);/* new petal only if needed  */
+        } else {
+            word = next_word(&tracker, &newpara);
         }
-        else
-        {
-            Insert_word(ROSE->tail, word);
-        }
-
-        // Use tracker, not copy!
-        word = seperate_words(&tracker, &newpara);
     }
 
     free(copy);
-    return ROSE;
+    return rose;
 }
+
 
 // ==========================================
 // 1. Traverse the Positional Tree (Reconstructs Paragraph)
@@ -550,8 +612,7 @@ Rose *Text_to_Rose(char *Text){
 // ==========================================
 // 3. Traverse a Single Petal
 // ==========================================
-void Print_Petal(PetalNode *P, int petal_number)
-{
+void Print_Petal(PetalNode *P, int petal_number){
     printf("\n========================================\n");
     printf(" PETAL (PARAGRAPH) #%d\n", petal_number);
     printf("========================================\n");
@@ -573,30 +634,6 @@ void Print_Petal(PetalNode *P, int petal_number)
 // ==========================================
 // 4. Traverse the Entire Rose
 // ==========================================
-void Print_Rose(Rose *ROSE)
-{
-    if (ROSE == NULL || ROSE->head == NULL)
-    {
-        printf("The Rose is empty.\n");
-        return;
-    }
-
-    printf("\n--- BEGINNING ROSE TRAVERSAL ---\n");
-    printf("Total Petals: %d\n", ROSE->size);
-
-    PetalNode *curr = ROSE->head;
-    int counter = 1;
-
-    // We use a do-while loop because the Petal list is circular!
-    do
-    {
-        Print_Petal(curr, counter);
-        curr = curr->next;
-        counter++;
-    } while (curr != ROSE->head); // Stop when we loop back to the start
-
-    printf("\n--- END OF ROSE TRAVERSAL ---\n");
-}
 
 int main()
 {
@@ -627,3 +664,4 @@ int main()
 
     return 0;
 }
+
