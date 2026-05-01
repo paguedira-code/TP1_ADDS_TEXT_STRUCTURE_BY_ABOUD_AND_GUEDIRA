@@ -196,3 +196,117 @@ PetalNode *difference(PetalNode *A, PetalNode *B)
 
     return diffAB;
 }
+
+
+
+int is_subset_pos(PetalNode *A, PetalNode *B)
+{
+    PosRBTNode *ptra = A->pos_tree->root;
+    PosRBTNode *ptrb = B->pos_tree->root;
+    if (ptra == &POS_NIL)
+    {
+        return 1;
+    }
+    if (ptrb == &POS_NIL)
+    {
+        return 0;
+    }
+
+    while (ptra->left != &POS_NIL)
+    {
+        ptra = ptra->left;
+    }
+    while (ptrb->left != &POS_NIL)
+    {
+        ptrb = ptrb->left;
+    }
+    PosRBTNode *refa = ptra;
+    PosRBTNode *refb = ptrb;
+    char *refw = ptra->word_ref->word;
+    while (ptrb != &POS_NIL)
+    {
+
+        while (ptrb != &POS_NIL && strcmp(refw, ptrb->word_ref->word) != 0)
+        {
+            ptrb = nextinorderPos(ptrb);
+        }
+        if (ptrb == &POS_NIL)
+        {
+            return 0;
+        }
+        refb = nextinorderPos(ptrb);
+
+        while (ptra != &POS_NIL && ptrb != &POS_NIL && strcmp(ptra->word_ref->word, ptrb->word_ref->word) != 0)
+        {
+            ptra = nextinorderPos(ptra);
+            ptrb = nextinorderPos(ptrb);
+        }
+        if (ptra == &POS_NIL)
+        {
+            return 1;
+        }
+        if (ptrb == &POS_NIL)
+        {
+            return 0;
+        }
+        ptrb = refb;
+        ptra = refa;
+    }
+    return 0;
+}
+
+int is_subset_nopos(PetalNode *A, PetalNode *B)
+{
+    AlphaRBTNode *ptra = A->alpha_tree->root;
+    AlphaRBTNode *ptrb = B->alpha_tree->root;
+    if (ptra == &ALPHA_NIL)
+    {
+        return 1;
+    }
+    if (ptrb == &ALPHA_NIL)
+    {
+        return 0;
+    }
+
+    while (ptra->left != &ALPHA_NIL)
+    {
+        ptra = ptra->left;
+    }
+    while (ptrb->left != &ALPHA_NIL)
+    {
+        ptrb = ptrb->left;
+    }
+
+    while (ptrb != &ALPHA_NIL)
+    {
+        if (ptra == &ALPHA_NIL)
+        {
+            return 1;
+        }
+        if (strcmp(ptra->word, ptrb->word) < 0)
+        {
+            return 0;
+        }
+
+        if (strcmp(ptra->word, ptrb->word) > 0)
+        {
+            ptrb = nextinorder(ptrb);
+        }
+        else
+        {
+            if (ptra->rep > ptrb->rep)
+            {
+                return 0;
+            }
+            ptra = nextinorder(ptra);
+            ptrb = nextinorder(ptrb);
+        }
+    }
+    return 0;
+}
+PetalNode * compliment(PetalNode* A,PetalNode* E){
+    if(is_subset_nopos(A,E)==0){
+        return NULL;
+    }
+    return difference(E,A);
+}
