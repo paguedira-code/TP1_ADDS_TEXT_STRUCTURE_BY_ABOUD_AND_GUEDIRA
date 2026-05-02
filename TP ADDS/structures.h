@@ -32,10 +32,10 @@ struct AlphaRBTNode{
    char *word; /* heap-allocated string       */
    PosNode *pos_list; /* circular DLL of position references  */
    int color;              /* RED (1) or BLACK (0)        */
+   int rep;
    AlphaRBTNode *parent;
    AlphaRBTNode *left;
    AlphaRBTNode *right;
-   int rep;
 };
 
 /* ============================================================
