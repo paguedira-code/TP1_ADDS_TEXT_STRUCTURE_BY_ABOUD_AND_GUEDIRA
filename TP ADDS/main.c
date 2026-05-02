@@ -3,8 +3,8 @@
 #include <string.h>
 #include "structures.h"
 //NIL definition for RBTs:
-AlphaRBTNode ALPHA_NIL = { NULL, NULL, 0, &ALPHA_NIL, &ALPHA_NIL, &ALPHA_NIL };
-PosRBTNode   POS_NIL   = { NULL,    NULL, 0, &POS_NIL,   &POS_NIL,   &POS_NIL   };
+AlphaRBTNode ALPHA_NIL = { NULL, NULL, BLACK, 0, &ALPHA_NIL, &ALPHA_NIL, &ALPHA_NIL };
+PosRBTNode   POS_NIL   = { NULL,    NULL, BLACK, &POS_NIL,   &POS_NIL,   &POS_NIL   };
 //pos_list_functions:
 PosNode* poslist_create_node(PosRBTNode* pos_ref) {
     PosNode* new = malloc(sizeof(PosNode));
@@ -134,7 +134,7 @@ AlphaRBTNode *allocateAlphaRBTNode(AlphaRBT *RBT){
     P->left = &ALPHA_NIL;
     P->right = &ALPHA_NIL;
     P->pos_list = NULL;
-    p->rep=0;
+    P->rep = 0;
     return P;
 }
 
@@ -389,13 +389,11 @@ AlphaRBTNode *Insert_AlphaRBT(AlphaRBT *RBT, char *word){
 
     if (node != &ALPHA_NIL)
     {
-        node->rep++;
         return node;
     }
 
     AlphaRBTNode *P = allocateAlphaRBTNode(RBT);
     P->word = strdup(word);
-    P->rep++;
     P->parent = parent;
 
     if (parent == &ALPHA_NIL)
@@ -467,6 +465,28 @@ void Print_AlphaRBT(AlphaRBTNode* node) {
     Print_AlphaRBT(node->right);
 }
 
+AlphaRBTNode* alpha_inorder_first(AlphaRBT* tree) {
+    AlphaRBTNode* node = tree->root;
+    while (node->left != &ALPHA_NIL)
+        node = node->left;
+    return node;
+}
+
+AlphaRBTNode* alpha_inorder_next(AlphaRBTNode* node) {
+    if (node->right != &ALPHA_NIL) {
+        node = node->right;
+        while (node->left != &ALPHA_NIL)
+            node = node->left;
+        return node;
+    }
+    AlphaRBTNode* parent = node->parent;
+    while (parent != &ALPHA_NIL && node == parent->right) {
+        node   = parent;
+        parent = parent->parent;
+    }
+    return parent;
+}
+
 //petal_functions:
 PetalNode *allocatePetalNode()
 {
@@ -481,9 +501,166 @@ PetalNode *allocatePetalNode()
 void Insert_word(PetalNode* P, char* word) {
     AlphaRBTNode* alphanode  = Insert_AlphaRBT(P->alpha_tree, word);
     PosRBTNode*   posnode    = Insert_PosRBT(P->pos_tree);
+    alphanode->rep++;
     posnode->word_ref        = alphanode;
     poslist_insert(&alphanode->pos_list, posnode);
 }
+
+PetalNode* petal_union(PetalNode* a, PetalNode* b) {
+    PetalNode*    result = allocatePetalNode();
+    AlphaRBTNode* ca     = alpha_inorder_first(a->alpha_tree);
+    AlphaRBTNode* cb     = alpha_inorder_first(b->alpha_tree);
+
+    while (ca != &ALPHA_NIL && cb != &ALPHA_NIL) {
+        int cmp = strcmp(ca->word, cb->word);
+        if (cmp < 0) {
+            Insert_AlphaRBT(result->alpha_tree, ca->word);
+            ca = alpha_inorder_next(ca);
+        } else if (cmp > 0) {
+            Insert_AlphaRBT(result->alpha_tree, cb->word);
+            cb = alpha_inorder_next(cb);
+        } else {
+            Insert_AlphaRBT(result->alpha_tree, ca->word);
+            ca = alpha_inorder_next(ca);
+            cb = alpha_inorder_next(cb);
+        }
+    }
+    while (ca != &ALPHA_NIL) {
+        Insert_AlphaRBT(result->alpha_tree, ca->word);
+        ca = alpha_inorder_next(ca);
+    }
+    while (cb != &ALPHA_NIL) {
+        Insert_AlphaRBT(result->alpha_tree, cb->word);
+        cb = alpha_inorder_next(cb);
+    }
+    return result;
+}
+
+PetalNode* petal_intersection(PetalNode* a, PetalNode* b) {
+    PetalNode*    result = allocatePetalNode();
+    AlphaRBTNode* ca     = alpha_inorder_first(a->alpha_tree);
+    AlphaRBTNode* cb     = alpha_inorder_first(b->alpha_tree);
+
+    while (ca != &ALPHA_NIL && cb != &ALPHA_NIL) {
+        int cmp = strcmp(ca->word, cb->word);
+        if (cmp < 0) {
+            ca = alpha_inorder_next(ca);
+        } else if (cmp > 0) {
+            cb = alpha_inorder_next(cb);
+        } else {
+            Insert_AlphaRBT(result->alpha_tree, ca->word);
+            ca = alpha_inorder_next(ca);
+            cb = alpha_inorder_next(cb);
+        }
+    }
+    return result;
+}
+
+PetalNode* petal_difference(PetalNode* a, PetalNode* b) {
+    PetalNode*    result = allocatePetalNode();
+    AlphaRBTNode* ca     = alpha_inorder_first(a->alpha_tree);
+    AlphaRBTNode* cb     = alpha_inorder_first(b->alpha_tree);
+
+    while (ca != &ALPHA_NIL && cb != &ALPHA_NIL) {
+        int cmp = strcmp(ca->word, cb->word);
+        if (cmp < 0) {
+            Insert_AlphaRBT(result->alpha_tree, ca->word);
+            ca = alpha_inorder_next(ca);
+        } else if (cmp > 0) {
+            cb = alpha_inorder_next(cb);
+        } else {
+            ca = alpha_inorder_next(ca);
+            cb = alpha_inorder_next(cb);
+        }
+    }
+    while (ca != &ALPHA_NIL) {
+        Insert_AlphaRBT(result->alpha_tree, ca->word);
+        ca = alpha_inorder_next(ca);
+    }
+    return result;
+}
+
+int petal_is_subset_of(PetalNode* a, PetalNode* b) {
+    AlphaRBTNode* ca = alpha_inorder_first(a->alpha_tree);
+    AlphaRBTNode* cb = alpha_inorder_first(b->alpha_tree);
+
+    while (ca != &ALPHA_NIL && cb != &ALPHA_NIL) {
+        int cmp = strcmp(ca->word, cb->word);
+        if (cmp < 0) {
+            return 0;
+        } else if (cmp > 0) {
+            cb = alpha_inorder_next(cb);
+        } else {
+            ca = alpha_inorder_next(ca);
+            cb = alpha_inorder_next(cb);
+        }
+    }
+    return (ca == &ALPHA_NIL) ? 1 : 0;
+}
+
+PetalNode* petal_symmetric_difference(PetalNode* a, PetalNode* b) {
+    PetalNode*    result = allocatePetalNode();
+    AlphaRBTNode* ca     = alpha_inorder_first(a->alpha_tree);
+    AlphaRBTNode* cb     = alpha_inorder_first(b->alpha_tree);
+
+    while (ca != &ALPHA_NIL && cb != &ALPHA_NIL) {
+        int cmp = strcmp(ca->word, cb->word);
+        if (cmp < 0) {
+            /* word only in A — belongs in result */
+            Insert_AlphaRBT(result->alpha_tree, ca->word);
+            ca = alpha_inorder_next(ca);
+        } else if (cmp > 0) {
+            /* word only in B — belongs in result */
+            Insert_AlphaRBT(result->alpha_tree, cb->word);
+            cb = alpha_inorder_next(cb);
+        } else {
+            /* word in both — skip both */
+            ca = alpha_inorder_next(ca);
+            cb = alpha_inorder_next(cb);
+        }
+    }
+
+    /* drain remaining nodes — none of them are in the other petal */
+    while (ca != &ALPHA_NIL) {
+        Insert_AlphaRBT(result->alpha_tree, ca->word);
+        ca = alpha_inorder_next(ca);
+    }
+    while (cb != &ALPHA_NIL) {
+        Insert_AlphaRBT(result->alpha_tree, cb->word);
+        cb = alpha_inorder_next(cb);
+    }
+
+    return result;
+}
+
+int petal_is_identical(PetalNode* a, PetalNode* b) {
+    AlphaRBTNode* ca = alpha_inorder_first(a->alpha_tree);
+    AlphaRBTNode* cb = alpha_inorder_first(b->alpha_tree);
+
+    while (ca != &ALPHA_NIL && cb != &ALPHA_NIL) {
+        if (strcmp(ca->word, cb->word) != 0)
+            return 0;
+        ca = alpha_inorder_next(ca);
+        cb = alpha_inorder_next(cb);
+    }
+
+    if (ca == &ALPHA_NIL && cb == &ALPHA_NIL)
+        return 1;
+    else
+        return 0;
+}
+
+PetalNode* rose_get_petal(Rose* rose, int i) {
+    if (rose->petals == NULL || i < 0 || i >= rose->size)
+        return NULL;
+
+    PetalNode* cur = rose->petals;
+    for (int j = 0; j < i; j++)
+        cur = cur->next;
+
+    return cur;
+}
+
 //text_processing_functions:
 int is_delimiter(char c) {
     return (c == ' '  || c == '\t' || c == '\n' ||
@@ -603,40 +780,54 @@ Rose* text_to_rose(char* text) {
     return rose;
 }
 
-
-// ==========================================
-// 1. Traverse the Positional Tree (Reconstructs Paragraph)
-// ==========================================
-
-// ==========================================
-// 2. Traverse the Alphabetical Tree & DLL
-// ==========================================
-
-// ==========================================
-// 3. Traverse a Single Petal
-// ==========================================
-void Print_Petal(PetalNode *P, int petal_number){
-    printf("\n========================================\n");
-    printf(" PETAL (PARAGRAPH) #%d\n", petal_number);
-    printf("========================================\n");
-
-    printf("\n[Reconstructed Text from Positional Tree]:\n> ");
-    if (P->pos_tree != NULL)
-    {
-        Print_PosRBT(P->pos_tree, P->pos_tree->root);
-    }
-    printf("\n");
-
-    printf("\n[Alphabetical Index from Alpha Tree]:\n");
-    if (P->alpha_tree != NULL)
-    {
-        Print_AlphaRBT(P->alpha_tree->root);
-    }
+PetalNode* rose_union_petals(Rose* rose, int i, int j) {
+    return petal_union(rose_get_petal(rose, i), rose_get_petal(rose, j));
 }
 
-// ==========================================
-// 4. Traverse the Entire Rose
-// ==========================================
+PetalNode* rose_intersect_petals(Rose* rose, int i, int j) {
+    return petal_intersection(rose_get_petal(rose, i), rose_get_petal(rose, j));
+}
+
+PetalNode* rose_diff_petals(Rose* rose, int i, int j) {
+    return petal_difference(rose_get_petal(rose, i), rose_get_petal(rose, j));
+}
+
+PetalNode* rose_sym_diff_petals(Rose* rose, int i, int j) {
+    return petal_symmetric_difference(rose_get_petal(rose, i), rose_get_petal(rose, j));
+}
+
+int rose_is_subset_petals(Rose* rose, int i, int j) {
+    return petal_is_subset_of(rose_get_petal(rose, i), rose_get_petal(rose, j));
+}
+
+int rose_is_identical_petals(Rose* rose, int i, int j) {
+    return petal_is_identical(rose_get_petal(rose, i), rose_get_petal(rose, j));
+}
+
+PetalNode* rose_cross_union(Rose* r1, int i, Rose* r2, int j) {
+    return petal_union(rose_get_petal(r1, i), rose_get_petal(r2, j));
+}
+
+PetalNode* rose_cross_intersection(Rose* r1, int i, Rose* r2, int j) {
+    return petal_intersection(rose_get_petal(r1, i), rose_get_petal(r2, j));
+}
+
+PetalNode* rose_cross_difference(Rose* r1, int i, Rose* r2, int j) {
+    return petal_difference(rose_get_petal(r1, i), rose_get_petal(r2, j));
+}
+
+PetalNode* rose_cross_sym_diff(Rose* r1, int i, Rose* r2, int j) {
+    return petal_symmetric_difference(rose_get_petal(r1, i), rose_get_petal(r2, j));
+}
+
+int rose_cross_is_subset(Rose* r1, int i, Rose* r2, int j) {
+    return petal_is_subset_of(rose_get_petal(r1, i), rose_get_petal(r2, j));
+}
+
+int rose_cross_is_identical(Rose* r1, int i, Rose* r2, int j) {
+    return petal_is_identical(rose_get_petal(r1, i), rose_get_petal(r2, j));
+}
+
 
 int main()
 {
@@ -667,4 +858,3 @@ int main()
 
     return 0;
 }
-
