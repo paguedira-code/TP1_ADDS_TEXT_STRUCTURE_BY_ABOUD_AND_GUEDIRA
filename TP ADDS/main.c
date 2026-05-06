@@ -62,53 +62,6 @@ void poslist_print(PosNode* head) {
     printf("]");
 }
 
-char *seperate_words(char **str, int *newpara){
-    if ((str == NULL) || (*str == NULL) || (**str == '\0'))
-    {
-        return NULL;
-    }
-    char *currpos = *str;
-    int i = 0;
-    while (currpos[i] != '\0' && (currpos[i] == '.' || currpos[i] == ',' || currpos[i] == '?' || currpos[i] == '"' || currpos[i] == ' ' || currpos[i] == '\t' || currpos[i] == '\n'))
-    {
-        i++;
-        if (currpos[i] == '\n' && newpara != NULL)
-        {
-            *newpara = 1;
-        }
-    }
-    if (currpos[i] == '\0')
-    {
-        *newpara = 0;
-        *str = NULL;
-        return NULL;
-    }
-    char *start = currpos + i;
-    while (currpos[i] != '\0' && currpos[i] != '.' && currpos[i] != ',' && currpos[i] != '?' && currpos[i] != '"' && currpos[i] != ' ' && currpos[i] != '\t' && currpos[i] != '\n')
-    {
-        i++;
-    }
-    if (currpos[i] == '\0')
-    {
-        *newpara = 1;
-        *str = NULL;
-    }
-    else
-    {
-        if (currpos[i] == '\n' && (currpos[i + 1] == '\0' || currpos[i + 1] == '\t'))
-        {
-            *newpara = 1;
-        }
-        else
-        {
-            *newpara = 0;
-        }
-        currpos[i] = '\0';
-        *str = currpos + i + 1;
-    }
-    return start;
-}
-
 //RBTs_functions:
 AlphaRBT *AlocateAlphaRBT(){
     AlphaRBT *tree = malloc(sizeof(AlphaRBT));
@@ -706,28 +659,16 @@ void detect_newpara(char* str, int i, char** next, int* newpara) {
 
 char* separate_words(char** str, int* newpara) {
     if (str == NULL || *str == NULL || **str == '\0') return NULL;
-
     char* cur = *str;
     int   i   = 0;
-
-    /* Step 1 — skip leading delimiters */
     i = skip_delimiters(cur, i, newpara);
-
-    /* Step 2 — nothing left after delimiters */
     if (is_end_of_string(cur, i)) {
         *str = NULL;
         return NULL;
     }
-
-    /* Step 3 — mark start of word */
     char* start = cur + i;
-
-    /* Step 4 — collect word characters */
     i = collect_word(cur, i);
-
-    /* Step 5 — detect paragraph break and advance str */
     detect_newpara(cur, i, str, newpara);
-
     return start;
 }
 
