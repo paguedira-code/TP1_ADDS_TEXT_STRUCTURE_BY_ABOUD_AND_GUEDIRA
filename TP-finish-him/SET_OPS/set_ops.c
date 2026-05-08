@@ -17,7 +17,7 @@ PetalNode* petal_union(PetalNode* a, PetalNode* b) {
             cb = alpha_inorder_next(cb);
         } else {
             new = Insert_AlphaRBT(res->alpha_tree, ca->word);
-            new = (ca->rep > cb->rep) ? ca->rep : cb->rep;
+            new->rep = (ca->rep > cb->rep) ? ca->rep : cb->rep;
             ca = alpha_inorder_next(ca);
             cb = alpha_inorder_next(cb);
         }
@@ -75,13 +75,16 @@ PetalNode* petal_symmetric_difference(PetalNode* a, PetalNode* b) {
     PetalNode* res = allocatePetalNode();
     AlphaRBTNode* ca = alpha_inorder_first(a->alpha_tree);
     AlphaRBTNode* cb = alpha_inorder_first(b->alpha_tree);
+    AlphaRBTNode* new = NULL;
     while (ca != &ALPHA_NIL && cb != &ALPHA_NIL) {
         int cmp = strcmp(ca->word, cb->word);
         if (cmp < 0) {
-            Insert_AlphaRBT(res->alpha_tree, ca->word);
+            new=Insert_AlphaRBT(res->alpha_tree, ca->word);
+            new->rep=ca->rep;
             ca = alpha_inorder_next(ca);
         } else if (cmp > 0) {
-            Insert_AlphaRBT(res->alpha_tree, cb->word);
+           new= Insert_AlphaRBT(res->alpha_tree, cb->word);
+            new->rep=cb->rep;
             cb = alpha_inorder_next(cb);
         } else {
             ca = alpha_inorder_next(ca);
@@ -98,27 +101,19 @@ int petal_is_subset_of(PetalNode* a, PetalNode* b) {
     AlphaRBTNode* cb = alpha_inorder_first(b->alpha_tree);
     while (ca != &ALPHA_NIL && cb != &ALPHA_NIL) {
         int cmp = strcmp(ca->word, cb->word);
-        if      (cmp == 0) { ca = alpha_inorder_next(ca); cb = alpha_inorder_next(cb); }
+        if      (cmp == 0) {
+            if(ca->rep<=cb->rep){
+            ca = alpha_inorder_next(ca); cb = alpha_inorder_next(cb);
+            }else{
+                return 0;
+            }
+        }
         else if (cmp > 0)  cb = alpha_inorder_next(cb);
         else return 0;
     }
     if (ca == &ALPHA_NIL) return 1;
     return 0;
 }
-
-int petal_is_identical(PetalNode* a, PetalNode* b) {
-    AlphaRBTNode* ca = alpha_inorder_first(a->alpha_tree);
-    AlphaRBTNode* cb = alpha_inorder_first(b->alpha_tree);
-    while (ca != &ALPHA_NIL && cb != &ALPHA_NIL) {
-        if (strcmp(ca->word, cb->word) != 0) return 0;
-        ca = alpha_inorder_next(ca);
-        cb = alpha_inorder_next(cb);
-    }
-    if (ca == &ALPHA_NIL && cb == &ALPHA_NIL) return 1;
-    return 0;
-}
-
-
 
 PetalNode* petal_sentence_intersection(PetalNode* P1, PetalNode* P2) {
     PetalNode* res = allocatePetalNode();
@@ -207,10 +202,7 @@ int petal_sentence_is_subset(PetalNode* P1, PetalNode* P2) {
     return 1;
 }
 
-int petal_sentence_is_identical(PetalNode* P1, PetalNode* P2) {
-    if (petal_sentence_count(P1) != petal_sentence_count(P2)) return 0;
-    return petal_sentence_is_subset(P1, P2);
-}
+
 
 /* recherche de sous-chaine positionnelle */
 int is_substring_pos(PetalNode* a, PetalNode* b) {
