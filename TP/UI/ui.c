@@ -1,104 +1,71 @@
-#include "ui.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <ctype.h>
-
-#ifdef _WIN32
-    #include <conio.h>
-    #define CLEAR_SCREEN() system("cls")
-    #define GETCH() _getch()
-#else
-    #define CLEAR_SCREEN() system("clear")
-    #define GETCH() getchar()
-#endif
+#include <conio.h>
 
 #define MAX_ROSES 10
-#define MAX_FILENAME 256
-#define MAX_WORD_LENGTH 100
+#define SCREEN_WIDTH 80
 
-// ============================================================================
-// GLOBAL STATE MANAGEMENT
-// ============================================================================
+int nombre_de_roses = 0;
+char noms_roses[MAX_ROSES][50];
 
-typedef struct {
-    Rose* rose;
-    char filename[MAX_FILENAME];
-    char name[50];
-} RoseInstance;
+// --- UTILS ---
 
-RoseInstance loaded_roses[MAX_ROSES];
-int num_loaded_roses = 0;
-
-// ============================================================================
-// UTILITY FUNCTIONS
-// ============================================================================
-
-void flush_input_buffer() {
+void vider_buffer() {
     int c;
     while ((c = getchar()) != '\n' && c != EOF);
 }
 
-void print_separator(int width) {
-    for (int i = 0; i < width; i++) printf("─");
-    printf("\n");
+void clrscr() {
+    printf("\e[1;1H\e[2J");
 }
 
-void print_header(const char* title) {
-    printf("\n");
-    print_separator(80);
-    printf("  %s\n", title);
-    print_separator(80);
-    printf("\n");
+void gotoxy(int x, int y) {
+    printf("\e[%d;%dH", y, x);
 }
 
-void print_error(const char* message) {
-    printf("\n  [ERROR] %s\n", message);
-    printf("  Press Enter to continue...");
-    GETCH();
+void print_rose_logo() {
+    char *logo[] = {
+        "  RRRRRRR   OOOOOOO    SSSSSSS  EEEEEEE  ",
+        "  RR    RR OO     OO  SS        EE       ",
+        "  RRRRRRR  OO     OO  SSSSSSS   EEEEE    ",
+        "  RR  RR   OO     OO        SS  EE       ",
+        "  RR   RR   OOOOOOO    SSSSSSS  EEEEEEE  "
+    };
+
+    for(int i = 0; i < 5; i++) {
+        gotoxy(20, 2 + i);
+        for(int j = 0; logo[i][j] != '\0'; j++) {
+            if(logo[i][j] != ' ') {
+                printf("\e[48;5;204m \e[0m");
+            } else {
+                printf(" ");
+            }
+        }
+    }
 }
 
-void print_success(const char* message) {
-    printf("\n  [✓] %s\n", message);
-    printf("  Press Enter to continue...");
-    GETCH();
-}
-
-void print_info(const char* message) {
-    printf("\n  [i] %s\n", message);
-}
-
-// ============================================================================
-// MENU SELECTION SYSTEM
-// ============================================================================
-
-int select_menu_option(const char** options, int num_options) {
+int selectionner_menu(char** options, int num_options, int x, int y) {
     int selected = 0;
     int key;
 
     while (1) {
-        CLEAR_SCREEN();
-        printf("\n");
-        print_separator(80);
-        printf("  USE ARROW KEYS (↑/↓) or W/S to navigate, ENTER to select\n");
-        print_separator(80);
-        printf("\n");
-
         for (int i = 0; i < num_options; i++) {
+            gotoxy(x, y + i);
             if (i == selected) {
-                printf("  ► %s\n", options[i]);
+                printf("\e[7m\e[38;5;204m%s\e[0m", options[i]);
             } else {
-                printf("    %s\n", options[i]);
+                // Non-selected options appear "greyed out" (standard color)
+                printf("\e[0m%s\e[0m", options[i]);
             }
         }
 
-        printf("\n");
-        key = GETCH();
+        key = _getch();
 
-        if (key == 224 || key == 27) {  // Arrow key prefix or escape
-            key = GETCH();
-            if (key == 72 || key == 'A') selected--;  // Up
-            if (key == 80 || key == 'B') selected++;  // Down
+        if (key == 224) {
+            key = _getch();
+            if (key == 72) selected--;
+            if (key == 80) selected++;
         } else if (key == 'w' || key == 'W') {
             selected--;
         } else if (key == 's' || key == 'S') {
@@ -112,922 +79,261 @@ int select_menu_option(const char** options, int num_options) {
     }
 }
 
-// ============================================================================
-// ROSE MANAGEMENT
-// ============================================================================
-
-int find_rose_by_name(const char* name) {
-    for (int i = 0; i < num_loaded_roses; i++) {
-        if (strcmp(loaded_roses[i].name, name) == 0) {
-            return i;
-        }
-    }
-    return -1;
-}
-
-void load_file() {
-    CLEAR_SCREEN();
-    print_header("LOAD FILE");
-
-    if (num_loaded_roses >= MAX_ROSES) {
-        print_error("Maximum number of ROSES reached!");
-        return;
-    }
-
-    char filename[MAX_FILENAME];
-    char rose_name[50];
-
-    printf("  Enter ROSE name: ");
-    fgets(rose_name, sizeof(rose_name), stdin);
-    rose_name[strcspn(rose_name, "\n")] = 0;
-
-    if (find_rose_by_name(rose_name) != -1) {
-        print_error("A ROSE with this name already exists!");
-        return;
-    }
-
-    printf("  Enter file path (.txt): ");
-    fgets(filename, sizeof(filename), stdin);
-    filename[strcspn(filename, "\n")] = 0;
-
-    // Try to load the file
-    Rose* r = file_to_rose(filename);
-    if (r == NULL) {
-        print_error("Failed to load file or create ROSE!");
-        return;
-    }
-
-    // Store the ROSE
-    loaded_roses[num_loaded_roses].rose = r;
-    strcpy(loaded_roses[num_loaded_roses].filename, filename);
-    strcpy(loaded_roses[num_loaded_roses].name, rose_name);
-    num_loaded_roses++;
-
-    printf("\n  ROSE '%s' loaded successfully!\n", rose_name);
-    printf("  Total petals (paragraphs): %d\n", r->size);
-    printf("  Total words: %d\n\n", rose_total_word_count(r));
-    printf("  Press Enter to continue...");
-    GETCH();
-}
-
-// ============================================================================
-// DISPLAY OPERATIONS
-// ============================================================================
-
-void display_full_rose() {
-    CLEAR_SCREEN();
-    print_header("DISPLAY FULL ROSE");
-
-    if (num_loaded_roses == 0) {
-        print_error("No ROSES loaded!");
-        return;
-    }
-
-    // List available ROSES
-    const char** rose_options = malloc((num_loaded_roses + 1) * sizeof(char*));
-    for (int i = 0; i < num_loaded_roses; i++) {
-        rose_options[i] = loaded_roses[i].name;
-    }
-    rose_options[num_loaded_roses] = "BACK";
-
-    int choice = select_menu_option(rose_options, num_loaded_roses + 1);
-    free(rose_options);
-
-    if (choice == num_loaded_roses) return;
-
-    Rose* r = loaded_roses[choice].rose;
-
-    CLEAR_SCREEN();
-    print_header("ROSE: Full Display");
-
-    printf("  [1] Display by Position (Original Order)\n");
-    printf("  [2] Display by Alphabet\n");
-    printf("  [3] BACK\n\n");
-
-    printf("  Select: ");
-    int display_choice;
-    scanf("%d", &display_choice);
-    flush_input_buffer();
-
-    CLEAR_SCREEN();
-    print_header("ROSE Content");
-
-    if (display_choice == 1) {
-        printf("  === DISPLAY BY POSITION ===\n\n");
-        for (int i = 0; i < r->size; i++) {
-            printf("  [PARAGRAPH %d]\n", i + 1);
-            petal_print_by_position(r->petals[i]);
-            printf("\n");
-        }
-    } else if (display_choice == 2) {
-        printf("  === DISPLAY BY ALPHABET ===\n\n");
-        for (int i = 0; i < r->size; i++) {
-            printf("  [PARAGRAPH %d]\n", i + 1);
-            petal_print_by_alpha(r->petals[i]);
-            printf("\n");
-        }
-    }
-
-    printf("  Press Enter to continue...");
-    GETCH();
-}
-
-void display_single_paragraph() {
-    CLEAR_SCREEN();
-    print_header("DISPLAY SINGLE PARAGRAPH");
-
-    if (num_loaded_roses == 0) {
-        print_error("No ROSES loaded!");
-        return;
-    }
-
-    // Select ROSE
-    const char** rose_options = malloc((num_loaded_roses + 1) * sizeof(char*));
-    for (int i = 0; i < num_loaded_roses; i++) {
-        rose_options[i] = loaded_roses[i].name;
-    }
-    rose_options[num_loaded_roses] = "BACK";
-
-    int rose_choice = select_menu_option(rose_options, num_loaded_roses + 1);
-    free(rose_options);
-
-    if (rose_choice == num_loaded_roses) return;
-
-    Rose* r = loaded_roses[rose_choice].rose;
-
-    // Select paragraph
-    printf("\n  Enter paragraph number (1-%d): ", r->size);
-    int para_num;
-    scanf("%d", &para_num);
-    flush_input_buffer();
-
-    if (para_num < 1 || para_num > r->size) {
-        print_error("Invalid paragraph number!");
-        return;
-    }
-
-    PetalNode* petal = rose_get_petal(r, para_num - 1);
-
-    CLEAR_SCREEN();
-    print_header("PARAGRAPH Display");
-
-    printf("  [1] Display by Position\n");
-    printf("  [2] Display by Alphabet\n");
-    printf("  [3] BACK\n\n");
-    printf("  Select: ");
-
-    int display_choice;
-    scanf("%d", &display_choice);
-    flush_input_buffer();
-
-    CLEAR_SCREEN();
-    print_header("Paragraph Content");
-
-    if (display_choice == 1) {
-        printf("  === DISPLAY BY POSITION ===\n\n");
-        petal_print_by_position(petal);
-    } else if (display_choice == 2) {
-        printf("  === DISPLAY BY ALPHABET ===\n\n");
-        petal_print_by_alpha(petal);
-    }
-
-    printf("\n\n  Press Enter to continue...");
-    GETCH();
-}
-
-// ============================================================================
-// STATISTICS
-// ============================================================================
-
-void display_paragraph_stats() {
-    CLEAR_SCREEN();
-    print_header("PARAGRAPH STATISTICS");
-
-    if (num_loaded_roses == 0) {
-        print_error("No ROSES loaded!");
-        return;
-    }
-
-    // Select ROSE
-    const char** rose_options = malloc((num_loaded_roses + 1) * sizeof(char*));
-    for (int i = 0; i < num_loaded_roses; i++) {
-        rose_options[i] = loaded_roses[i].name;
-    }
-    rose_options[num_loaded_roses] = "BACK";
-
-    int rose_choice = select_menu_option(rose_options, num_loaded_roses + 1);
-    free(rose_options);
-
-    if (rose_choice == num_loaded_roses) return;
-
-    Rose* r = loaded_roses[rose_choice].rose;
-
-    // Select paragraph
-    printf("\n  Enter paragraph number (1-%d): ", r->size);
-    int para_num;
-    scanf("%d", &para_num);
-    flush_input_buffer();
-
-    if (para_num < 1 || para_num > r->size) {
-        print_error("Invalid paragraph number!");
-        return;
-    }
-
-    CLEAR_SCREEN();
-    print_header("Paragraph Statistics");
-    rose_print_stats(r, para_num - 1);
-    printf("\n  Press Enter to continue...");
-    GETCH();
-}
-
-void display_full_rose_stats() {
-    CLEAR_SCREEN();
-    print_header("FULL ROSE STATISTICS");
-
-    if (num_loaded_roses == 0) {
-        print_error("No ROSES loaded!");
-        return;
-    }
-
-    // Select ROSE
-    const char** rose_options = malloc((num_loaded_roses + 1) * sizeof(char*));
-    for (int i = 0; i < num_loaded_roses; i++) {
-        rose_options[i] = loaded_roses[i].name;
-    }
-    rose_options[num_loaded_roses] = "BACK";
-
-    int rose_choice = select_menu_option(rose_options, num_loaded_roses + 1);
-    free(rose_options);
-
-    if (rose_choice == num_loaded_roses) return;
-
-    CLEAR_SCREEN();
-    print_header("Full ROSE Statistics");
-    rose_global_stats(loaded_roses[rose_choice].rose);
-    printf("\n  Press Enter to continue...");
-    GETCH();
-}
-
-void display_word_frequency() {
-    CLEAR_SCREEN();
-    print_header("WORD FREQUENCY");
-
-    if (num_loaded_roses == 0) {
-        print_error("No ROSES loaded!");
-        return;
-    }
-
-    // Select ROSE
-    const char** rose_options = malloc((num_loaded_roses + 1) * sizeof(char*));
-    for (int i = 0; i < num_loaded_roses; i++) {
-        rose_options[i] = loaded_roses[i].name;
-    }
-    rose_options[num_loaded_roses] = "BACK";
-
-    int rose_choice = select_menu_option(rose_options, num_loaded_roses + 1);
-    free(rose_options);
-
-    if (rose_choice == num_loaded_roses) return;
-
-    Rose* r = loaded_roses[rose_choice].rose;
-
-    // Select paragraph
-    printf("\n  Enter paragraph number (1-%d): ", r->size);
-    int para_num;
-    scanf("%d", &para_num);
-    flush_input_buffer();
-
-    if (para_num < 1 || para_num > r->size) {
-        print_error("Invalid paragraph number!");
-        return;
-    }
-
-    CLEAR_SCREEN();
-    print_header("Word Frequency Table");
-    rose_print_frequency_table(r, para_num - 1);
-    printf("\n  Press Enter to continue...");
-    GETCH();
-}
-
-// ============================================================================
-// SEARCH OPERATIONS
-// ============================================================================
-
-void search_word_at_position() {
-    CLEAR_SCREEN();
-    print_header("SEARCH WORD AT LOCAL POSITION");
-
-    if (num_loaded_roses == 0) {
-        print_error("No ROSES loaded!");
-        return;
-    }
-
-    // Select ROSE
-    const char** rose_options = malloc((num_loaded_roses + 1) * sizeof(char*));
-    for (int i = 0; i < num_loaded_roses; i++) {
-        rose_options[i] = loaded_roses[i].name;
-    }
-    rose_options[num_loaded_roses] = "BACK";
-
-    int rose_choice = select_menu_option(rose_options, num_loaded_roses + 1);
-    free(rose_options);
-
-    if (rose_choice == num_loaded_roses) return;
-
-    Rose* r = loaded_roses[rose_choice].rose;
-
-    // Select paragraph
-    printf("\n  Enter paragraph number (1-%d): ", r->size);
-    int para_num;
-    scanf("%d", &para_num);
-    flush_input_buffer();
-
-    if (para_num < 1 || para_num > r->size) {
-        print_error("Invalid paragraph number!");
-        return;
-    }
-
-    // Enter position
-    printf("  Enter word position: ");
-    int pos;
-    scanf("%d", &pos);
-    flush_input_buffer();
-
-    CLEAR_SCREEN();
-    print_header("Search Result");
-
-    char* word = rose_word_at_pos(r, para_num - 1, pos);
-    if (word) {
-        printf("  Word at position %d: '%s'\n", pos, word);
-    } else {
-        printf("  No word found at position %d\n", pos);
-    }
-
-    printf("\n  Press Enter to continue...");
-    GETCH();
-}
-
-void find_word_across_paragraphs() {
-    CLEAR_SCREEN();
-    print_header("FIND WORD ACROSS ALL PARAGRAPHS");
-
-    if (num_loaded_roses == 0) {
-        print_error("No ROSES loaded!");
-        return;
-    }
-
-    // Select ROSE
-    const char** rose_options = malloc((num_loaded_roses + 1) * sizeof(char*));
-    for (int i = 0; i < num_loaded_roses; i++) {
-        rose_options[i] = loaded_roses[i].name;
-    }
-    rose_options[num_loaded_roses] = "BACK";
-
-    int rose_choice = select_menu_option(rose_options, num_loaded_roses + 1);
-    free(rose_options);
-
-    if (rose_choice == num_loaded_roses) return;
-
-    Rose* r = loaded_roses[rose_choice].rose;
-
-    // Enter word to search
-    char word[MAX_WORD_LENGTH];
-    printf("\n  Enter word to search: ");
-    fgets(word, sizeof(word), stdin);
-    word[strcspn(word, "\n")] = 0;
-
-    CLEAR_SCREEN();
-    print_header("Search Results");
-
-    int found = 0;
-    for (int i = 0; i < r->size; i++) {
-        printf("  [PARAGRAPH %d]\n", i + 1);
-        printf("    Total words: %d\n", petal_word_count(r->petals[i]));
-    }
-
-    printf("\n  Press Enter to continue...");
-    GETCH();
-}
-
-// ============================================================================
-// MENU: DISPLAY SUBMENU
-// ============================================================================
-
-void menu_display() {
-    int done = 0;
-    while (!done) {
-        const char* options[] = {
-            "[1] Full ROSE",
-            "[2] Single Paragraph",
-            "[3] Paragraph Statistics",
-            "[4] Full ROSE Summary",
-            "[5] Word Frequency",
-            "[6] BACK"
-        };
-
-        int choice = select_menu_option(options, 6);
-
-        switch (choice) {
-            case 0: display_full_rose(); break;
-            case 1: display_single_paragraph(); break;
-            case 2: display_paragraph_stats(); break;
-            case 3: display_full_rose_stats(); break;
-            case 4: display_word_frequency(); break;
-            case 5: done = 1; break;
+// --- ANALYSIS SUB-MENUS ---
+
+void menu_analyse_paragraphe(int rose_idx, int para_idx) {
+    int retour_para = 0;
+    char* options_analyse[4] = {
+        "      1. FULL PHRASE ANALYSIS (HASH)  ",
+        "      2. ACCESS WORD AT POSITION      ",
+        "      3. SHOW SENTENCE STARTERS       ",
+        "      4. RETOUR                       "
+    };
+
+    while (!retour_para) {
+        clrscr();
+        gotoxy(22, 5);
+        printf("\e[38;5;204m--- ANALYSE : %s | PARA %d ---\e[0m", noms_roses[rose_idx], para_idx);
+
+        int choix = selectionner_menu(options_analyse, 4, 20, 8);
+
+        switch(choix) {
+            case 0:
+                clrscr(); gotoxy(20, 10);
+                printf("\e[0mExecution de l'analyse par empreinte... (Hash)\e[0m");
+                _getch(); break;
+            case 1:
+                clrscr(); gotoxy(20, 10);
+                printf("\e[0mAcces direct au mot par position...\e[0m");
+                _getch(); break;
+            case 2:
+                clrscr(); gotoxy(20, 10);
+                printf("\e[0mAffichage des debuts de phrases...\e[0m");
+                _getch(); break;
+            case 3:
+                retour_para = 1; break;
         }
     }
 }
 
-// ============================================================================
-// MENU: SEARCH SUBMENU
-// ============================================================================
+void menu_analyse_rose() {
+    if (nombre_de_roses == 0) {
+        clrscr();
+        gotoxy(30, 5);
+        printf("\e[38;5;196m--- AUCUNE ROSE ---\e[0m");
+        gotoxy(20, 12);
+        printf("\e[0mAppuyez sur une touche pour retourner...\e[0m");
+        _getch(); return;
+    }
 
-void menu_search() {
-    int done = 0;
-    while (!done) {
-        const char* options[] = {
-            "[1] Word at Local Position",
-            "[2] Find Word Across All Paragraphs",
-            "[3] BACK"
-        };
+    clrscr();
+    gotoxy(25, 5);
+    printf("\e[38;5;204m--- SELECTION DE LA ROSE A ANALYSER ---\e[0m");
 
-        int choice = select_menu_option(options, 3);
+    char* liste_roses[MAX_ROSES + 1];
+    char buffer_roses[MAX_ROSES + 1][60];
+    for(int i = 0; i < nombre_de_roses; i++) {
+        sprintf(buffer_roses[i], "      %d. %-24s ", i + 1, noms_roses[i]);
+        liste_roses[i] = buffer_roses[i];
+    }
+    sprintf(buffer_roses[nombre_de_roses], "      %d. RETOUR                       ", nombre_de_roses + 1);
+    liste_roses[nombre_de_roses] = buffer_roses[nombre_de_roses];
 
-        switch (choice) {
-            case 0: search_word_at_position(); break;
-            case 1: find_word_across_paragraphs(); break;
-            case 2: done = 1; break;
+    int choix_rose = selectionner_menu(liste_roses, nombre_de_roses + 1, 20, 8);
+    if (choix_rose == nombre_de_roses) return;
+
+    // --- NEW PARAGRAPH SELECTION MINI-MENU ---
+    int total_paras = 5; // Placeholder N = 5
+
+    clrscr();
+    gotoxy(25, 5);
+    printf("\e[38;5;204m--- ANALYSE ROSE : %s ---\e[0m", noms_roses[choix_rose]);
+    gotoxy(15, 7);
+    printf("\e[0m(number of paragraphs is : %d)\e[0m", total_paras);
+
+    // Create the paragraph list
+    char* liste_paras[6]; // 5 paragraphs + RETOUR
+    char buffer_paras[6][40];
+    for(int i = 0; i < total_paras; i++) {
+        sprintf(buffer_paras[i], "      Paragraph %d                ", i + 1);
+        liste_paras[i] = buffer_paras[i];
+    }
+    sprintf(buffer_paras[total_paras], "      RETOUR                      ");
+    liste_paras[total_paras] = buffer_paras[total_paras];
+
+    int choix_para = selectionner_menu(liste_paras, total_paras + 1, 20, 9);
+
+    if (choix_para == total_paras) return; // Selected RETOUR
+
+    menu_analyse_paragraphe(choix_rose, choix_para + 1);
+}
+
+// --- ORIGINAL LOGIC FUNCTIONS ---
+
+void a_propos() {
+    clrscr();
+    gotoxy(28, 5);
+    printf("\e[38;5;204m--- A PROPOS DE ROSE ---\e[0m");
+    gotoxy(15, 8);
+    printf("\e[0mApplication : Gestion des Roses (ROSE)\e[0m");
+    gotoxy(15, 9);
+    printf("\e[0mDescription : Systeme de structuration de texte base sur\e[0m");
+    gotoxy(15, 10);
+    printf("\e[0m              les arbres Rouge-Noir (Red-Black Trees).\e[0m");
+    gotoxy(20, 14);
+    printf("\e[0mAppuyez sur une touche pour retourner...\e[0m");
+    _getch();
+}
+
+void creer_rose() {
+    if (nombre_de_roses >= MAX_ROSES) {
+        clrscr();
+        gotoxy(28, 5);
+        printf("\e[38;5;196m--- LIMITE ATTEINTE ---\e[0m");
+        _getch(); return;
+    }
+
+    char nom_fichier[256];
+    clrscr();
+    gotoxy(22, 5);
+    printf("\e[38;5;204m--- CREER UNE NOUVELLE ROSE (%d/%d) ---\e[0m", nombre_de_roses + 1, MAX_ROSES);
+    gotoxy(15, 8);
+    printf("\e[0mEntrez un nom pour cette rose : \e[0m");
+    scanf(" %49[^\n]", noms_roses[nombre_de_roses]);
+    gotoxy(15, 10);
+    printf("\e[0mEntrez le chemin du fichier (.txt) : \e[0m");
+    scanf(" %255[^\n]", nom_fichier);
+    vider_buffer();
+
+    FILE *file = fopen(nom_fichier, "r");
+    if (!file) {
+        gotoxy(22, 13);
+        printf("\e[38;5;196mERREUR: Le fichier n'existe pas !\e[0m");
+        _getch(); return;
+    }
+    fclose(file);
+
+    nombre_de_roses++;
+    gotoxy(25, 15);
+    printf("\e[38;5;204mRose creee avec succes !\e[0m");
+}
+
+void voir_roses() {
+    int retour_liste = 0;
+    if (nombre_de_roses == 0) {
+        clrscr(); gotoxy(30, 5);
+        printf("\e[38;5;196m--- AUCUNE ROSE ---\e[0m");
+        _getch(); return;
+    }
+
+    while (!retour_liste) {
+        clrscr();
+        gotoxy(28, 5);
+        printf("\e[38;5;204m--- VOIR LES ROSES ---\e[0m");
+        char options_str[MAX_ROSES + 1][60];
+        char* liste_roses[MAX_ROSES + 1];
+
+        for (int i = 0; i < nombre_de_roses; i++) {
+            sprintf(options_str[i], "      %d. %-24s ", i + 1, noms_roses[i]);
+            liste_roses[i] = options_str[i];
+        }
+        sprintf(options_str[nombre_de_roses], "      %d. RETOUR                       ", nombre_de_roses + 1);
+        liste_roses[nombre_de_roses] = options_str[nombre_de_roses];
+
+        int choix_rose = selectionner_menu(liste_roses, nombre_de_roses + 1, 20, 8);
+        if (choix_rose == nombre_de_roses) {
+            retour_liste = 1;
+        } else {
+            int retour_action = 0;
+            while (!retour_action) {
+                clrscr(); gotoxy(25, 5);
+                printf("\e[38;5;204m--- ACTION SUR : %s ---\e[0m", noms_roses[choix_rose]);
+                char* actions[2] = {"      1. AFFICHER (Affichage Rose)    ", "      2. RETOUR                       "};
+                int choix_action = selectionner_menu(actions, 2, 20, 8);
+                if (choix_action == 0) {
+                    clrscr(); gotoxy(20, 5);
+                    printf("\e[0mAffichage de la rose '%s'...\e[0m", noms_roses[choix_rose]);
+                    _getch();
+                } else retour_action = 1;
+            }
         }
     }
 }
 
-// ============================================================================
-// MENU: SET OPERATIONS (WORD-BASED)
-// ============================================================================
-
-int select_two_petals(Rose** r1, int* p1, Rose** r2, int* p2) {
-    if (num_loaded_roses == 0) {
-        print_error("No ROSES loaded!");
-        return 0;
+void menu_operations() {
+    if (nombre_de_roses == 0) {
+        clrscr(); gotoxy(30, 5);
+        printf("\e[38;5;196m--- AUCUNE ROSE ---\e[0m");
+        _getch(); return;
     }
 
-    CLEAR_SCREEN();
-    print_header("SELECT PETAL A (First operand)");
+    int retour_ops = 0;
+    char* menu_ops[6] = {"      1. UNION                        ", "      2. INTERSECTION                 ", "      3. DIFFERENCE                   ", "      4. COMPLEMENT (SYM. DIFF)       ", "      5. SOUS-ENSEMBLE                ", "      6. RETOUR                       "};
 
-    const char** rose_options = malloc((num_loaded_roses + 1) * sizeof(char*));
-    for (int i = 0; i < num_loaded_roses; i++) {
-        rose_options[i] = loaded_roses[i].name;
+    while (!retour_ops) {
+        clrscr(); gotoxy(25, 5);
+        printf("\e[38;5;204m--- OPERATIONS SUR ROSES ---\e[0m");
+        int type_op = selectionner_menu(menu_ops, 6, 20, 8);
+        if (type_op == 5) { retour_ops = 1; continue; }
+        // ... (remaining logic)
+        retour_ops = 1;
     }
-    rose_options[num_loaded_roses] = "BACK";
-
-    int rose1_choice = select_menu_option(rose_options, num_loaded_roses + 1);
-    if (rose1_choice == num_loaded_roses) {
-        free(rose_options);
-        return 0;
-    }
-
-    *r1 = loaded_roses[rose1_choice].rose;
-
-    printf("\n  Enter paragraph number for Petal A (1-%d): ", (*r1)->size);
-    scanf("%d", p1);
-    flush_input_buffer();
-    (*p1)--;
-
-    if (*p1 < 0 || *p1 >= (*r1)->size) {
-        print_error("Invalid paragraph number!");
-        free(rose_options);
-        return 0;
-    }
-
-    CLEAR_SCREEN();
-    print_header("SELECT PETAL B (Second operand)");
-
-    int rose2_choice = select_menu_option(rose_options, num_loaded_roses + 1);
-    free(rose_options);
-
-    if (rose2_choice == num_loaded_roses) {
-        return 0;
-    }
-
-    *r2 = loaded_roses[rose2_choice].rose;
-
-    printf("\n  Enter paragraph number for Petal B (1-%d): ", (*r2)->size);
-    scanf("%d", p2);
-    flush_input_buffer();
-    (*p2)--;
-
-    if (*p2 < 0 || *p2 >= (*r2)->size) {
-        print_error("Invalid paragraph number!");
-        return 0;
-    }
-
-    return 1;
 }
 
-void word_ops_union() {
-    Rose *r1, *r2;
-    int p1, p2;
+// --- NAVIGATION ---
 
-    if (!select_two_petals(&r1, &p1, &r2, &p2)) return;
+void menu_demarrer() {
+    int retour = 0;
+    char* menu_options[5] = {
+        "      1. CREER UNE NOUVELLE ROSE      ",
+        "      2. VOIR LES ROSES               ",
+        "      3. OPERATIONS SUR ROSES         ",
+        "      4. ANALYSE ROSE (PETALES)       ",
+        "      5. RETOUR                       "
+    };
 
-    CLEAR_SCREEN();
-    print_header("WORD UNION (A ∪ B)");
+    while (!retour) {
+        clrscr();
+        gotoxy(24, 5);
+        printf("\e[38;5;204m--- GESTION DES ROSES (ROSE) ---\e[0m");
 
-    PetalNode* result = rose_union_petals(r1, p1, r2, p2);
+        int choix = selectionner_menu(menu_options, 5, 20, 8);
 
-    if (result) {
-        printf("  === RESULT ===\n\n");
-        petal_print_by_position(result);
-        petal_free(result);
-    } else {
-        print_error("Operation failed!");
-    }
-
-    printf("\n  Press Enter to continue...");
-    GETCH();
-}
-
-void word_ops_intersection() {
-    Rose *r1, *r2;
-    int p1, p2;
-
-    if (!select_two_petals(&r1, &p1, &r2, &p2)) return;
-
-    CLEAR_SCREEN();
-    print_header("WORD INTERSECTION (A ∩ B)");
-
-    PetalNode* result = rose_intersect_petals(r1, p1, r2, p2);
-
-    if (result) {
-        printf("  === RESULT ===\n\n");
-        petal_print_by_position(result);
-        petal_free(result);
-    } else {
-        print_error("Operation failed!");
-    }
-
-    printf("\n  Press Enter to continue...");
-    GETCH();
-}
-
-void word_ops_difference() {
-    Rose *r1, *r2;
-    int p1, p2;
-
-    if (!select_two_petals(&r1, &p1, &r2, &p2)) return;
-
-    CLEAR_SCREEN();
-    print_header("WORD DIFFERENCE (A \\ B)");
-
-    PetalNode* result = rose_diff_petals(r1, p1, r2, p2);
-
-    if (result) {
-        printf("  === RESULT ===\n\n");
-        petal_print_by_position(result);
-        petal_free(result);
-    } else {
-        print_error("Operation failed!");
-    }
-
-    printf("\n  Press Enter to continue...");
-    GETCH();
-}
-
-void word_ops_symmetric_diff() {
-    Rose *r1, *r2;
-    int p1, p2;
-
-    if (!select_two_petals(&r1, &p1, &r2, &p2)) return;
-
-    CLEAR_SCREEN();
-    print_header("WORD SYMMETRIC DIFFERENCE (A △ B)");
-
-    PetalNode* result = rose_sym_diff_petals(r1, p1, r2, p2);
-
-    if (result) {
-        printf("  === RESULT ===\n\n");
-        petal_print_by_position(result);
-        petal_free(result);
-    } else {
-        print_error("Operation failed!");
-    }
-
-    printf("\n  Press Enter to continue...");
-    GETCH();
-}
-
-void word_ops_subset() {
-    Rose *r1, *r2;
-    int p1, p2;
-
-    if (!select_two_petals(&r1, &p1, &r2, &p2)) return;
-
-    CLEAR_SCREEN();
-    print_header("SUBSET CHECK (A ⊆ B ?)");
-
-    int result = rose_is_subset_petals(r1, p1, r2, p2);
-
-    if (result) {
-        printf("  ✓ Petal A IS a subset of Petal B\n");
-    } else {
-        printf("  ✗ Petal A IS NOT a subset of Petal B\n");
-    }
-
-    printf("\n  Press Enter to continue...");
-    GETCH();
-}
-
-void menu_word_operations() {
-    int done = 0;
-    while (!done) {
-        const char* options[] = {
-            "[1] Union (A ∪ B)",
-            "[2] Intersection (A ∩ B)",
-            "[3] Difference (A \\ B)",
-            "[4] Symmetric Difference (A △ B)",
-            "[5] Subset Check (A ⊆ B ?)",
-            "[6] BACK"
-        };
-
-        int choice = select_menu_option(options, 6);
-
-        switch (choice) {
-            case 0: word_ops_union(); break;
-            case 1: word_ops_intersection(); break;
-            case 2: word_ops_difference(); break;
-            case 3: word_ops_symmetric_diff(); break;
-            case 4: word_ops_subset(); break;
-            case 5: done = 1; break;
+        switch(choix) {
+            case 0:
+                creer_rose();
+                gotoxy(20, 18); printf("\e[0mAppuyez sur une touche pour continuer...\e[0m");
+                _getch(); break;
+            case 1: voir_roses(); break;
+            case 2: menu_operations(); break;
+            case 3: menu_analyse_rose(); break;
+            case 4: retour = 1; break;
         }
     }
-}
-
-// ============================================================================
-// MENU: SET OPERATIONS (SENTENCE-BASED)
-// ============================================================================
-
-void sentence_ops_union() {
-    Rose *r1, *r2;
-    int p1, p2;
-
-    if (!select_two_petals(&r1, &p1, &r2, &p2)) return;
-
-    CLEAR_SCREEN();
-    print_header("SENTENCE UNION (A ∪ B)");
-
-    PetalNode* result = rose_sentence_union(r1, p1, r2, p2);
-
-    if (result) {
-        printf("  === RESULT ===\n\n");
-        petal_print_sentences(result);
-        petal_free(result);
-    } else {
-        print_error("Operation failed!");
-    }
-
-    printf("\n  Press Enter to continue...");
-    GETCH();
-}
-
-void sentence_ops_intersection() {
-    Rose *r1, *r2;
-    int p1, p2;
-
-    if (!select_two_petals(&r1, &p1, &r2, &p2)) return;
-
-    CLEAR_SCREEN();
-    print_header("SENTENCE INTERSECTION (A ∩ B)");
-
-    PetalNode* result = rose_sentence_intersection(r1, p1, r2, p2);
-
-    if (result) {
-        printf("  === RESULT ===\n\n");
-        petal_print_sentences(result);
-        petal_free(result);
-    } else {
-        print_error("Operation failed!");
-    }
-
-    printf("\n  Press Enter to continue...");
-    GETCH();
-}
-
-void sentence_ops_difference() {
-    Rose *r1, *r2;
-    int p1, p2;
-
-    if (!select_two_petals(&r1, &p1, &r2, &p2)) return;
-
-    CLEAR_SCREEN();
-    print_header("SENTENCE DIFFERENCE (A \\ B)");
-
-    PetalNode* result = rose_sentence_difference(r1, p1, r2, p2);
-
-    if (result) {
-        printf("  === RESULT ===\n\n");
-        petal_print_sentences(result);
-        petal_free(result);
-    } else {
-        print_error("Operation failed!");
-    }
-
-    printf("\n  Press Enter to continue...");
-    GETCH();
-}
-
-void sentence_ops_symmetric_diff() {
-    Rose *r1, *r2;
-    int p1, p2;
-
-    if (!select_two_petals(&r1, &p1, &r2, &p2)) return;
-
-    CLEAR_SCREEN();
-    print_header("SENTENCE SYMMETRIC DIFFERENCE (A △ B)");
-
-    PetalNode* result = rose_sentence_symmetric_difference(r1, p1, r2, p2);
-
-    if (result) {
-        printf("  === RESULT ===\n\n");
-        petal_print_sentences(result);
-        petal_free(result);
-    } else {
-        print_error("Operation failed!");
-    }
-
-    printf("\n  Press Enter to continue...");
-    GETCH();
-}
-
-void sentence_ops_subset() {
-    Rose *r1, *r2;
-    int p1, p2;
-
-    if (!select_two_petals(&r1, &p1, &r2, &p2)) return;
-
-    CLEAR_SCREEN();
-    print_header("SENTENCE SUBSET CHECK (A ⊆ B ?)");
-
-    int result = rose_sentence_is_subset(r1, p1, r2, p2);
-
-    if (result) {
-        printf("  ✓ Petal A IS a subset of Petal B (sentence-based)\n");
-    } else {
-        printf("  ✗ Petal A IS NOT a subset of Petal B (sentence-based)\n");
-    }
-
-    printf("\n  Press Enter to continue...");
-    GETCH();
-}
-
-void menu_sentence_operations() {
-    int done = 0;
-    while (!done) {
-        const char* options[] = {
-            "[1] Sentence Union (A ∪ B)",
-            "[2] Sentence Intersection (A ∩ B)",
-            "[3] Sentence Difference (A \\ B)",
-            "[4] Sentence Symmetric Difference (A △ B)",
-            "[5] Sentence Subset Check (A ⊆ B ?)",
-            "[6] BACK"
-        };
-
-        int choice = select_menu_option(options, 6);
-
-        switch (choice) {
-            case 0: sentence_ops_union(); break;
-            case 1: sentence_ops_intersection(); break;
-            case 2: sentence_ops_difference(); break;
-            case 3: sentence_ops_symmetric_diff(); break;
-            case 4: sentence_ops_subset(); break;
-            case 5: done = 1; break;
-        }
-    }
-}
-
-// ============================================================================
-// MEMORY MANAGEMENT
-// ============================================================================
-
-void free_rose() {
-    CLEAR_SCREEN();
-    print_header("FREE A LOADED ROSE");
-
-    if (num_loaded_roses == 0) {
-        print_error("No ROSES loaded!");
-        return;
-    }
-
-    const char** rose_options = malloc((num_loaded_roses + 1) * sizeof(char*));
-    for (int i = 0; i < num_loaded_roses; i++) {
-        rose_options[i] = loaded_roses[i].name;
-    }
-    rose_options[num_loaded_roses] = "CANCEL";
-
-    int choice = select_menu_option(rose_options, num_loaded_roses + 1);
-    free(rose_options);
-
-    if (choice == num_loaded_roses) return;
-
-    // Free the ROSE
-    rose_free(loaded_roses[choice].rose);
-
-    // Remove from list
-    for (int i = choice; i < num_loaded_roses - 1; i++) {
-        loaded_roses[i] = loaded_roses[i + 1];
-    }
-    num_loaded_roses--;
-
-    print_success("ROSE freed successfully!");
-}
-
-void free_all_roses() {
-    CLEAR_SCREEN();
-    print_header("FREE ALL ROSES");
-
-    for (int i = 0; i < num_loaded_roses; i++) {
-        rose_free(loaded_roses[i].rose);
-    }
-    num_loaded_roses = 0;
-
-    print_success("All ROSES freed successfully!");
-}
-
-// ============================================================================
-// ABOUT & MAIN MENU
-// ============================================================================
-
-void about() {
-    CLEAR_SCREEN();
-    print_header("ABOUT ROSE");
-
-    printf("  Application: ROSE (Red-Black Tree Ordered Sentence Engine)\n\n");
-    printf("  Description:\n");
-    printf("    ROSE is a sophisticated text analysis system built on a three-tier\n");
-    printf("    hierarchical architecture using advanced data structures.\n\n");
-    printf("  Key Features:\n");
-    printf("    • Circular doubly-linked list of Petals (paragraphs)\n");
-    printf("    • Red-Black Trees for word indexing and positioning\n");
-    printf("    • Global Lexicon for memory-efficient word storage\n");
-    printf("    • Set Operations on both words and sentences\n");
-    printf("    • Digital Fingerprinting (Hashing) for sentence comparison\n");
-    printf("    • Optimized O(log n) search complexity\n\n");
-    printf("  Creators: Aboud & Guedira\n\n");
-
-    printf("  Press Enter to return...");
-    GETCH();
 }
 
 void main_menu() {
-    int done = 0;
-    while (!done) {
-        const char* options[] = {
-            "[1] Load File",
-            "[2] Display",
-            "[3] Search",
-            "[4] Word-Based Set Operations",
-            "[5] Sentence-Based Set Operations",
-            "[6] Free Memory",
-            "[7] About",
-            "[8] Exit"
+    int quitter = 0;
+    while (!quitter) {
+        clrscr();
+        print_rose_logo();
+        char* menu_options[3] = {
+            "         1. DEMARRER ROSE         ",
+            "         2. A PROPOS              ",
+            "         3. QUITTER               "
         };
-
-        int choice = select_menu_option(options, 8);
-
-        switch (choice) {
-            case 0: load_file(); break;
-            case 1: menu_display(); break;
-            case 2: menu_search(); break;
-            case 3: menu_word_operations(); break;
-            case 4: menu_sentence_operations(); break;
-            case 5:
-                {
-                    const char* free_options[] = {
-                        "[1] Free a Single ROSE",
-                        "[2] Free All ROSES",
-                        "[3] BACK"
-                    };
-                    int free_choice = select_menu_option(free_options, 3);
-                    if (free_choice == 0) free_rose();
-                    else if (free_choice == 1) free_all_roses();
-                }
-                break;
-            case 6: about(); break;
-            case 7: done = 1; break;
+        gotoxy(20, 9);
+        printf("\e[38;5;204m--- BIENVENUE DANS L'APPLICATION ROSE ---\e[0m");
+        int choix = selectionner_menu(menu_options, 3, 23, 12);
+        switch(choix) {
+            case 0: menu_demarrer(); break;
+            case 1: a_propos(); break;
+            case 2: quitter = 1; break;
         }
     }
 }
 
-// ============================================================================
-// ENTRY POINT
-// ============================================================================
-
 int main() {
     main_menu();
-    
-    // Cleanup
-    for (int i = 0; i < num_loaded_roses; i++) {
-        rose_free(loaded_roses[i].rose);
-    }
-
     return 0;
 }
