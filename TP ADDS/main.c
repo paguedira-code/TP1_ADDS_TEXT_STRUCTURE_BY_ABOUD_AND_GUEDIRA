@@ -460,148 +460,123 @@ void Insert_word(PetalNode* P, char* word) {
 }
 
 PetalNode* petal_union(PetalNode* a, PetalNode* b) {
-    PetalNode*    result = allocatePetalNode();
-    AlphaRBTNode* ca     = alpha_inorder_first(a->alpha_tree);
-    AlphaRBTNode* cb     = alpha_inorder_first(b->alpha_tree);
-
+    PetalNode* res = allocatePetalNode();
+    AlphaRBTNode* ca = alpha_inorder_first(a->alpha_tree);
+    AlphaRBTNode* cb = alpha_inorder_first(b->alpha_tree);
+    AlphaRBTNode* new = NULL;
     while (ca != &ALPHA_NIL && cb != &ALPHA_NIL) {
         int cmp = strcmp(ca->word, cb->word);
         if (cmp < 0) {
-            Insert_AlphaRBT(result->alpha_tree, ca->word);
+            new = Insert_AlphaRBT(res->alpha_tree, ca->word);
+            new->rep = ca->rep;
             ca = alpha_inorder_next(ca);
         } else if (cmp > 0) {
-            Insert_AlphaRBT(result->alpha_tree, cb->word);
+            new = Insert_AlphaRBT(res->alpha_tree, cb->word);
+            new->rep = cb->rep;
             cb = alpha_inorder_next(cb);
         } else {
-            Insert_AlphaRBT(result->alpha_tree, ca->word);
+            new = Insert_AlphaRBT(res->alpha_tree, ca->word);
+            new->rep = (ca->rep > cb->rep) ? ca->rep : cb->rep;  // FIXED: assign to rep field
             ca = alpha_inorder_next(ca);
             cb = alpha_inorder_next(cb);
         }
     }
-    while (ca != &ALPHA_NIL) {
-        Insert_AlphaRBT(result->alpha_tree, ca->word);
-        ca = alpha_inorder_next(ca);
-    }
-    while (cb != &ALPHA_NIL) {
-        Insert_AlphaRBT(result->alpha_tree, cb->word);
-        cb = alpha_inorder_next(cb);
-    }
-    return result;
+    while (ca != &ALPHA_NIL) { Insert_AlphaRBT(res->alpha_tree, ca->word); ca = alpha_inorder_next(ca); }
+    while (cb != &ALPHA_NIL) { Insert_AlphaRBT(res->alpha_tree, cb->word); cb = alpha_inorder_next(cb); }
+    return res;
 }
 
 PetalNode* petal_intersection(PetalNode* a, PetalNode* b) {
-    PetalNode*    result = allocatePetalNode();
-    AlphaRBTNode* ca     = alpha_inorder_first(a->alpha_tree);
-    AlphaRBTNode* cb     = alpha_inorder_first(b->alpha_tree);
-
+    PetalNode* res = allocatePetalNode();
+    AlphaRBTNode* ca = alpha_inorder_first(a->alpha_tree);
+    AlphaRBTNode* cb = alpha_inorder_first(b->alpha_tree);
     while (ca != &ALPHA_NIL && cb != &ALPHA_NIL) {
         int cmp = strcmp(ca->word, cb->word);
-        if (cmp < 0) {
-            ca = alpha_inorder_next(ca);
-        } else if (cmp > 0) {
-            cb = alpha_inorder_next(cb);
-        } else {
-            Insert_AlphaRBT(result->alpha_tree, ca->word);
+        if      (cmp < 0) ca = alpha_inorder_next(ca);
+        else if (cmp > 0) cb = alpha_inorder_next(cb);
+        else {
+            AlphaRBTNode* new = Insert_AlphaRBT(res->alpha_tree, ca->word);
+            new->rep = (ca->rep < cb->rep) ? ca->rep : cb->rep;
             ca = alpha_inorder_next(ca);
             cb = alpha_inorder_next(cb);
         }
     }
-    return result;
+    return res;
 }
 
 PetalNode* petal_difference(PetalNode* a, PetalNode* b) {
-    PetalNode*    result = allocatePetalNode();
-    AlphaRBTNode* ca     = alpha_inorder_first(a->alpha_tree);
-    AlphaRBTNode* cb     = alpha_inorder_first(b->alpha_tree);
-
+    PetalNode* res = allocatePetalNode();
+    AlphaRBTNode* ca = alpha_inorder_first(a->alpha_tree);
+    AlphaRBTNode* cb = alpha_inorder_first(b->alpha_tree);
+    AlphaRBTNode* new = NULL;
     while (ca != &ALPHA_NIL && cb != &ALPHA_NIL) {
         int cmp = strcmp(ca->word, cb->word);
         if (cmp < 0) {
-            Insert_AlphaRBT(result->alpha_tree, ca->word);
+            new = Insert_AlphaRBT(res->alpha_tree, ca->word);
+            new->rep = ca->rep;        
             ca = alpha_inorder_next(ca);
         } else if (cmp > 0) {
+            cb = alpha_inorder_next(cb);
+        } else {
+            if(ca->rep > cb->rep){
+                new = Insert_AlphaRBT(res->alpha_tree, ca->word);
+                new->rep = ca->rep - cb->rep;
+            }
+            ca = alpha_inorder_next(ca);
+            cb = alpha_inorder_next(cb);
+        }
+    }
+    while (ca != &ALPHA_NIL) { Insert_AlphaRBT(res->alpha_tree, ca->word); ca = alpha_inorder_next(ca); }
+    return res;
+}
+
+PetalNode* petal_symmetric_difference(PetalNode* a, PetalNode* b) {
+    PetalNode* res = allocatePetalNode();
+    AlphaRBTNode* ca = alpha_inorder_first(a->alpha_tree);
+    AlphaRBTNode* cb = alpha_inorder_first(b->alpha_tree);
+    while (ca != &ALPHA_NIL && cb != &ALPHA_NIL) {
+        int cmp = strcmp(ca->word, cb->word);
+        if (cmp < 0) {
+            Insert_AlphaRBT(res->alpha_tree, ca->word);
+            ca = alpha_inorder_next(ca);
+        } else if (cmp > 0) {
+            Insert_AlphaRBT(res->alpha_tree, cb->word);
             cb = alpha_inorder_next(cb);
         } else {
             ca = alpha_inorder_next(ca);
             cb = alpha_inorder_next(cb);
         }
     }
-    while (ca != &ALPHA_NIL) {
-        Insert_AlphaRBT(result->alpha_tree, ca->word);
-        ca = alpha_inorder_next(ca);
-    }
-    return result;
+    while (ca != &ALPHA_NIL) { Insert_AlphaRBT(res->alpha_tree, ca->word); ca = alpha_inorder_next(ca); }
+    while (cb != &ALPHA_NIL) { Insert_AlphaRBT(res->alpha_tree, cb->word); cb = alpha_inorder_next(cb); }
+    return res;
 }
 
 int petal_is_subset_of(PetalNode* a, PetalNode* b) {
     AlphaRBTNode* ca = alpha_inorder_first(a->alpha_tree);
     AlphaRBTNode* cb = alpha_inorder_first(b->alpha_tree);
-
     while (ca != &ALPHA_NIL && cb != &ALPHA_NIL) {
         int cmp = strcmp(ca->word, cb->word);
-        if (cmp < 0) {
-            return 0;
-        } else if (cmp > 0) {
-            cb = alpha_inorder_next(cb);
-        } else {
-            ca = alpha_inorder_next(ca);
-            cb = alpha_inorder_next(cb);
-        }
+        if      (cmp == 0) { ca = alpha_inorder_next(ca); cb = alpha_inorder_next(cb); }
+        else if (cmp > 0)  cb = alpha_inorder_next(cb);
+        else return 0;
     }
-    return (ca == &ALPHA_NIL) ? 1 : 0;
-}
-
-PetalNode* petal_symmetric_difference(PetalNode* a, PetalNode* b) {
-    PetalNode*    result = allocatePetalNode();
-    AlphaRBTNode* ca     = alpha_inorder_first(a->alpha_tree);
-    AlphaRBTNode* cb     = alpha_inorder_first(b->alpha_tree);
-
-    while (ca != &ALPHA_NIL && cb != &ALPHA_NIL) {
-        int cmp = strcmp(ca->word, cb->word);
-        if (cmp < 0) {
-            /* word only in A — belongs in result */
-            Insert_AlphaRBT(result->alpha_tree, ca->word);
-            ca = alpha_inorder_next(ca);
-        } else if (cmp > 0) {
-            /* word only in B — belongs in result */
-            Insert_AlphaRBT(result->alpha_tree, cb->word);
-            cb = alpha_inorder_next(cb);
-        } else {
-            /* word in both — skip both */
-            ca = alpha_inorder_next(ca);
-            cb = alpha_inorder_next(cb);
-        }
-    }
-
-    /* drain remaining nodes — none of them are in the other petal */
-    while (ca != &ALPHA_NIL) {
-        Insert_AlphaRBT(result->alpha_tree, ca->word);
-        ca = alpha_inorder_next(ca);
-    }
-    while (cb != &ALPHA_NIL) {
-        Insert_AlphaRBT(result->alpha_tree, cb->word);
-        cb = alpha_inorder_next(cb);
-    }
-
-    return result;
+    if (ca == &ALPHA_NIL) return 1;
+    return 0;
 }
 
 int petal_is_identical(PetalNode* a, PetalNode* b) {
     AlphaRBTNode* ca = alpha_inorder_first(a->alpha_tree);
     AlphaRBTNode* cb = alpha_inorder_first(b->alpha_tree);
-
     while (ca != &ALPHA_NIL && cb != &ALPHA_NIL) {
-        if (strcmp(ca->word, cb->word) != 0)
-            return 0;
+        if (strcmp(ca->word, cb->word) != 0) return 0;
         ca = alpha_inorder_next(ca);
         cb = alpha_inorder_next(cb);
     }
-
-    if (ca == &ALPHA_NIL && cb == &ALPHA_NIL)
-        return 1;
-    else
-        return 0;
+    if (ca == &ALPHA_NIL && cb == &ALPHA_NIL) return 1;
+    return 0;
 }
+
 
 PetalNode* rose_get_petal(Rose* rose, int i) {
     if (rose->petals == NULL || i < 0 || i >= rose->size)
