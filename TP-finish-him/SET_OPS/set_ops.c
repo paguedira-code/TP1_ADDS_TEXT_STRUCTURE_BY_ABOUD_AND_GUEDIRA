@@ -115,91 +115,346 @@ int petal_is_subset_of(PetalNode* a, PetalNode* b) {
     return 0;
 }
 
-PetalNode* petal_sentence_intersection(PetalNode* P1, PetalNode* P2) {
-    PetalNode* res = allocatePetalNode();
-    SentenceEntry** t = build_sent_table(P2);
-    if (!t) return res;
-    PosRBTNode* c = pos_inorder_first(P1->pos_tree);
-    while (c != &POS_NIL) {
-        if (c->sent_flag && sent_in_table(t, c))
-            insert_sent(res, c);
-        c = pos_inorder_next(c);
-    }
-    free_sent_table(t);
-    return res;
-}
-
-PetalNode* petal_sentence_difference(PetalNode* P1, PetalNode* P2) {
-    PetalNode* res = allocatePetalNode();
-    SentenceEntry** t = build_sent_table(P2);
-    if (!t) return res;
-    PosRBTNode* c = pos_inorder_first(P1->pos_tree);
-    while (c != &POS_NIL) {
-        if (c->sent_flag && !sent_in_table(t, c))
-            insert_sent(res, c);
-        c = pos_inorder_next(c);
-    }
-    free_sent_table(t);
-    return res;
-}
-
-PetalNode* petal_sentence_union(PetalNode* P1, PetalNode* P2) {
-    PetalNode* res = allocatePetalNode();
-    /* d'abord toutes les phrases de P1 */
-    PosRBTNode* c = pos_inorder_first(P1->pos_tree);
-    while (c != &POS_NIL) {
-        if (c->sent_flag) insert_sent(res, c);
-        c = pos_inorder_next(c);
-    }
-    /* puis les phrases de P2 pas encore dans P1 */
-    SentenceEntry** t = build_sent_table(P1);
-    if (!t) return res;
-    c = pos_inorder_first(P2->pos_tree);
-    while (c != &POS_NIL) {
-        if (c->sent_flag && !sent_in_table(t, c))
-            insert_sent(res, c);
-        c = pos_inorder_next(c);
-    }
-    free_sent_table(t);
-    return res;
-}
-
-PetalNode* petal_sentence_symmetric_difference(PetalNode* P1, PetalNode* P2) {
-    PetalNode* res = allocatePetalNode();
-    /* phrases de P1 absentes de P2 */
-    SentenceEntry** t2 = build_sent_table(P2);
-    if (!t2) return res;
-    PosRBTNode* c = pos_inorder_first(P1->pos_tree);
-    while (c != &POS_NIL) {
-        if (c->sent_flag && !sent_in_table(t2, c)) insert_sent(res, c);
-        c = pos_inorder_next(c);
-    }
-    free_sent_table(t2);
-    /* phrases de P2 absentes de P1 */
-    SentenceEntry** t1 = build_sent_table(P1);
-    if (!t1) return res;
-    c = pos_inorder_first(P2->pos_tree);
-    while (c != &POS_NIL) {
-        if (c->sent_flag && !sent_in_table(t1, c)) insert_sent(res, c);
-        c = pos_inorder_next(c);
-    }
-    free_sent_table(t1);
-    return res;
-}
-
-int petal_sentence_is_subset(PetalNode* P1, PetalNode* P2) {
-    SentenceEntry** t = build_sent_table(P2);
-    if (!t) return 0;
-    PosRBTNode* c = pos_inorder_first(P1->pos_tree);
-    while (c != &POS_NIL) {
-        if (c->sent_flag && !sent_in_table(t, c)) {
-            free_sent_table(t);
+    int sentence_cmp(PosRBTNode *s1, PosRBTNode *s2) {
+    while (s1 != &POS_NIL && s2 != &POS_NIL) {
+        if (strcmp(s1->word_ref->word, s2->word_ref->word) != 0) {
             return 0;
         }
-        c = pos_inorder_next(c);
+
+        s1 = nextinorder(s1);
+        s2 = nextinorder(s2);
+
+        int s1_ended = 0;
+        if (s1 == &POS_NIL || s1->is_start_of_sentence != 0) {
+            s1_ended = 1;
+        }
+
+        int s2_ended = 0;
+        if (s2 == &POS_NIL || s2->is_start_of_sentence != 0) {
+            s2_ended = 1;
+        }
+
+        if (s1_ended == 1 && s2_ended == 1) {
+            return 1;
+        }
+
+        if (s1_ended == 1 || s2_ended == 1) {
+            return 0;
+        }
     }
-    free_sent_table(t);
+    return 0;
+}
+
+PetalNode *intersection_Phrase(PetalNode *p1, PetalNode *p2) {
+    if (p1->pos_tree->root == &POS_NIL || p2->pos_tree->root == &POS_NIL) {
+        return NULL;
+    }
+
+    PetalNode *res = allocatePetalNode();
+    res->is_pos = 1;
+
+    int n2 = 0;
+    unsigned long *arr2 = hash_petal(p2, &n2);
+    PosRBTNode *curr1 = p1->pos_tree->root;
+
+    while (curr1 != &POS_NIL && curr1->left != &POS_NIL) {
+        curr1 = curr1->left;
+    }
+
+    while (curr1 != &POS_NIL) {
+        unsigned long h1 = hash(curr1);
+        int match_confirmed = 0;
+
+        if (arr2 != NULL && bsearch(&h1, arr2, n2, sizeof(unsigned long), hash_cmp) != NULL) {
+            PosRBTNode *search_node = p2->pos_tree->root;
+            while (search_node != &POS_NIL && search_node->left != &POS_NIL) {
+                search_node = search_node->left;
+            }
+            while (search_node != &POS_NIL) {
+                if (hash(search_node) == h1) {
+                    if (sentence_cmp(curr1, search_node) == 1) {
+                        match_confirmed = 1;
+                        break;
+                    }
+                }
+                search_node = nextinorder(search_node);
+                while (search_node != &POS_NIL && search_node->is_start_of_sentence == 0) {
+                    search_node = nextinorder(search_node);
+                }
+            }
+        }
+
+        if (match_confirmed == 1) {
+            Insert_word(res, curr1->word_ref->word, 1);
+            curr1 = nextinorder(curr1);
+            while (curr1 != &POS_NIL && curr1->is_start_of_sentence == 0) {
+                Insert_word(res, curr1->word_ref->word, 1);
+                curr1 = nextinorder(curr1);
+            }
+        } else {
+            curr1 = nextinorder(curr1);
+            while (curr1 != &POS_NIL && curr1->is_start_of_sentence == 0) {
+                curr1 = nextinorder(curr1);
+            }
+        }
+    }
+    free(arr2);
+    return res;
+}
+
+PetalNode *union_Phrase(PetalNode *p1, PetalNode *p2) {
+    PetalNode *res = allocatePetalNode();
+    res->is_pos = 1;
+    int n1 = 0;
+    unsigned long *arr1 = hash_petal(p1, &n1);
+
+    PosRBTNode *curr1 = p1->pos_tree->root;
+    while (curr1 != &POS_NIL && curr1->left != &POS_NIL) {
+        curr1 = curr1->left;
+    }
+    while (curr1 != &POS_NIL) {
+        Insert_word(res, curr1->word_ref->word, 1);
+        curr1 = nextinorder(curr1);
+        while (curr1 != &POS_NIL && curr1->is_start_of_sentence == 0) {
+            Insert_word(res, curr1->word_ref->word, 1);
+            curr1 = nextinorder(curr1);
+        }
+    }
+
+    PosRBTNode *curr2 = p2->pos_tree->root;
+    while (curr2 != &POS_NIL && curr2->left != &POS_NIL) {
+        curr2 = curr2->left;
+    }
+    while (curr2 != &POS_NIL) {
+        unsigned long h2 = hash(curr2);
+        int already_exists = 0;
+
+        if (arr1 != NULL && bsearch(&h2, arr1, n1, sizeof(unsigned long), hash_cmp) != NULL) {
+            PosRBTNode *search_node = p1->pos_tree->root;
+            while (search_node != &POS_NIL && search_node->left != &POS_NIL) {
+                search_node = search_node->left;
+            }
+            while (search_node != &POS_NIL) {
+                if (hash(search_node) == h2) {
+                    if (sentence_cmp(curr2, search_node) == 1) {
+                        already_exists = 1;
+                        break;
+                    }
+                }
+                search_node = nextinorder(search_node);
+                while (search_node != &POS_NIL && search_node->is_start_of_sentence == 0) {
+                    search_node = nextinorder(search_node);
+                }
+            }
+        }
+
+        if (already_exists == 0) {
+            Insert_word(res, curr2->word_ref->word, 1);
+            curr2 = nextinorder(curr2);
+            while (curr2 != &POS_NIL && curr2->is_start_of_sentence == 0) {
+                Insert_word(res, curr2->word_ref->word, 1);
+                curr2 = nextinorder(curr2);
+            }
+        } else {
+            curr2 = nextinorder(curr2);
+            while (curr2 != &POS_NIL && curr2->is_start_of_sentence == 0) {
+                curr2 = nextinorder(curr2);
+            }
+        }
+    }
+    free(arr1);
+    return res;
+}
+
+PetalNode *difference_Phrase(PetalNode *p1, PetalNode *p2) {
+    if (p1->pos_tree->root == &POS_NIL) {
+        return NULL;
+    }
+    PetalNode *res = allocatePetalNode();
+    res->is_pos = 1;
+    int n2 = 0;
+    unsigned long *arr2 = hash_petal(p2, &n2);
+
+    PosRBTNode *curr1 = p1->pos_tree->root;
+    while (curr1 != &POS_NIL && curr1->left != &POS_NIL) {
+        curr1 = curr1->left;
+    }
+
+    while (curr1 != &POS_NIL) {
+        unsigned long h1 = hash(curr1);
+        int in_p2 = 0;
+
+        if (arr2 != NULL && bsearch(&h1, arr2, n2, sizeof(unsigned long), hash_cmp) != NULL) {
+            PosRBTNode *search_node = p2->pos_tree->root;
+            while (search_node != &POS_NIL && search_node->left != &POS_NIL) {
+                search_node = search_node->left;
+            }
+            while (search_node != &POS_NIL) {
+                if (hash(search_node) == h1) {
+                    if (sentence_cmp(curr1, search_node) == 1) {
+                        in_p2 = 1;
+                        break;
+                    }
+                }
+                search_node = nextinorder(search_node);
+                while (search_node != &POS_NIL && search_node->is_start_of_sentence == 0) {
+                    search_node = nextinorder(search_node);
+                }
+            }
+        }
+
+        if (in_p2 == 0) {
+            Insert_word(res, curr1->word_ref->word, 1);
+            curr1 = nextinorder(curr1);
+            while (curr1 != &POS_NIL && curr1->is_start_of_sentence == 0) {
+                Insert_word(res, curr1->word_ref->word, 1);
+                curr1 = nextinorder(curr1);
+            }
+        } else {
+            curr1 = nextinorder(curr1);
+            while (curr1 != &POS_NIL && curr1->is_start_of_sentence == 0) {
+                curr1 = nextinorder(curr1);
+            }
+        }
+    }
+    free(arr2);
+    return res;
+}
+
+int subset_Phrase(PetalNode *p1, PetalNode *p2) {
+    if (p1->pos_tree->root == &POS_NIL) {
+        return 1;
+    }
+    if (p2->pos_tree->root == &POS_NIL) {
+        return 0;
+    }
+    int n2 = 0;
+    unsigned long *arr2 = hash_petal(p2, &n2);
+
+    PosRBTNode *curr1 = p1->pos_tree->root;
+    while (curr1 != &POS_NIL && curr1->left != &POS_NIL) {
+        curr1 = curr1->left;
+    }
+
+    while (curr1 != &POS_NIL) {
+        unsigned long h1 = hash(curr1);
+        int sentence_found = 0;
+
+        if (arr2 != NULL && bsearch(&h1, arr2, n2, sizeof(unsigned long), hash_cmp) != NULL) {
+            PosRBTNode *search_node = p2->pos_tree->root;
+            while (search_node != &POS_NIL && search_node->left != &POS_NIL) {
+                search_node = search_node->left;
+            }
+            while (search_node != &POS_NIL) {
+                if (hash(search_node) == h1) {
+                    if (sentence_cmp(curr1, search_node) == 1) {
+                        sentence_found = 1;
+                        break;
+                    }
+                }
+                search_node = nextinorder(search_node);
+                while (search_node != &POS_NIL && search_node->is_start_of_sentence == 0) {
+                    search_node = nextinorder(search_node);
+                }
+            }
+        }
+
+        if (sentence_found == 0) {
+            free(arr2);
+            return 0;
+        }
+
+        curr1 = nextinorder(curr1);
+        while (curr1 != &POS_NIL && curr1->is_start_of_sentence == 0) {
+            curr1 = nextinorder(curr1);
+        }
+    }
+    free(arr2);
     return 1;
+}
+
+unsigned long hash(PosRBTNode *curr)
+{
+    unsigned long h = 0;
+    int factor = 1;
+
+    if (curr == &POS_NIL)
+        return 0;
+
+    do
+    {
+        int i = 0;
+        while (curr->word_ref->word[i] != '\0')
+        {
+            h += curr->word_ref->word[i] * factor;
+            factor++;
+            i++;
+        }
+
+        curr = nextinorder(curr);
+    } while (curr != &POS_NIL && curr->is_start_of_sentence == 0);
+
+    return h;
+}
+
+int hash_cmp(const void *a, const void *b)
+{
+    unsigned long h1 = *(const unsigned long *)a;
+    unsigned long h2 = *(const unsigned long *)b;
+    if (h1 > h2)
+    {
+        return 1;
+    }
+    else
+    {
+        if (h1 < h2)
+        {
+            return -1;
+        }
+        else
+        {
+            return 0;
+        }
+    }
+}
+
+unsigned long *hash_petal(PetalNode *p, int *len)
+{
+    int n = 0;
+    PosRBTNode *curr = p->pos_tree->root;
+
+    while (curr != &POS_NIL && curr->left != &POS_NIL)
+        curr = curr->left;
+
+    PosRBTNode *tmp = curr;
+    while (tmp != &POS_NIL)
+    {
+        n++;
+        do
+        {
+            tmp = nextinorder(tmp);
+        } while (tmp != &POS_NIL && tmp->is_start_of_sentence == 0);
+    }
+
+    *len = n;
+    if (n == 0)
+        return NULL;
+
+    unsigned long *arr = malloc(n * sizeof(unsigned long));
+    int i = 0;
+
+    while (curr != &POS_NIL)
+    {
+        arr[i] = hash(curr);
+        i++;
+        do
+        {
+            curr = nextinorder(curr);
+        } while (curr != &POS_NIL && curr->is_start_of_sentence == 0);
+    }
+
+    qsort(arr, n, sizeof(unsigned long), hash_cmp);
+    return arr;
 }
 
 
