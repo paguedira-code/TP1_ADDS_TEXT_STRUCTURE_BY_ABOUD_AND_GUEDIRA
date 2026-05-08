@@ -599,3 +599,88 @@ int subset_Phrase(PetalNode *p1, PetalNode *p2) {
     return 1;
 }
 
+unsigned long hash(PosRBTNode *curr)
+{
+    unsigned long h = 0;
+    int factor = 1;
+
+    if (curr == &POS_NIL)
+        return 0;
+
+    do
+    {
+        int i = 0;
+        while (curr->word_ref->word[i] != '\0')
+        {
+            h += curr->word_ref->word[i] * factor;
+            factor++;
+            i++;
+        }
+
+        curr = nextinorder(curr);
+    } while (curr != &POS_NIL && curr->is_start_of_sentence == 0);
+
+    return h;
+}
+
+int hash_cmp(const void *a, const void *b)
+{
+    unsigned long h1 = *(const unsigned long *)a;
+    unsigned long h2 = *(const unsigned long *)b;
+    if (h1 > h2)
+    {
+        return 1;
+    }
+    else
+    {
+        if (h1 < h2)
+        {
+            return -1;
+        }
+        else
+        {
+            return 0;
+        }
+    }
+}
+
+unsigned long *hash_petal(PetalNode *p, int *len)
+{
+    int n = 0;
+    PosRBTNode *curr = p->pos_tree->root;
+
+    while (curr != &POS_NIL && curr->left != &POS_NIL)
+        curr = curr->left;
+
+    PosRBTNode *tmp = curr;
+    while (tmp != &POS_NIL)
+    {
+        n++;
+        do
+        {
+            tmp = nextinorder(tmp);
+        } while (tmp != &POS_NIL && tmp->is_start_of_sentence == 0);
+    }
+
+    *len = n;
+    if (n == 0)
+        return NULL;
+
+    unsigned long *arr = malloc(n * sizeof(unsigned long));
+    int i = 0;
+
+    while (curr != &POS_NIL)
+    {
+        arr[i] = hash(curr);
+        i++;
+        do
+        {
+            curr = nextinorder(curr);
+        } while (curr != &POS_NIL && curr->is_start_of_sentence == 0);
+    }
+
+    qsort(arr, n, sizeof(unsigned long), hash_cmp);
+    return arr;
+}
+
+
