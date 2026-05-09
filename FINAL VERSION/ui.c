@@ -2,107 +2,106 @@
 #include <stdlib.h>
 #include <string.h>
 #ifdef _WIN32
-    #include <conio.h>
+#include <conio.h>
 #else
-    #include <termios.h>
-    #include <unistd.h>
+#include <termios.h>
+#include <unistd.h>
 #endif
 #include "structures.h"
 
-/* ============================================================
- *  DECLARATIONS EXTERNES
- * ============================================================ */
-extern Rose*      charger_fichier(const char* nom_fichier);
-extern void       rose_free(Rose* rose);
-extern PetalNode* rose_get_petal(Rose* rose, int index);
-extern void       petal_free(PetalNode* petale);
-extern void       petal_print_by_position(PetalNode* petale);
-extern void       petal_print_by_alpha(PetalNode* petale);
-extern void       petal_print_sentences(PetalNode* petale);
-extern void       petal_print_stats(PetalNode* petale);
-extern void       petal_print_frequency_table(PetalNode* petale);
-extern int        petal_word_count(PetalNode* petale);
-extern int        petal_sentence_count(PetalNode* petale);
-extern char*      petal_word_at_pos(PetalNode* petale, int position);
-extern void       rose_find_petals_with_word(Rose* rose, const char* mot);
-extern int        rose_total_word_count(Rose* rose);
+extern Rose* load_file(const char* filename);
+extern void rose_free(Rose* r);
+extern PetalNode* rose_get_petal(Rose* r, int index);
+extern void petal_free(PetalNode* p);
+extern void petal_print_by_position(PetalNode* p);
+extern void petal_print_by_alpha(PetalNode* p);
+extern void petal_print_stats(PetalNode* p);
+extern void petal_print_frequency_table(PetalNode* p);
+extern int petal_word_count(PetalNode* p);
+extern char* petal_word_at_pos(PetalNode* p, int position);
+extern char* petal_most_frequent_word(PetalNode* p);
+extern int petal_unique_word_count(PetalNode* p);
+extern void rose_find_petals_with_word(Rose* r, const char* word);
+extern int rose_total_word_count(Rose* r);
 extern PetalNode* petal_union(PetalNode* a, PetalNode* b);
 extern PetalNode* petal_intersection(PetalNode* a, PetalNode* b);
 extern PetalNode* petal_difference(PetalNode* a, PetalNode* b);
 extern PetalNode* petal_symmetric_difference(PetalNode* a, PetalNode* b);
-extern int        petal_is_subset_of(PetalNode* a, PetalNode* b);
-extern int        petal_is_identical(PetalNode* a, PetalNode* b);
-extern PetalNode* petal_sentence_union(PetalNode* P1, PetalNode* P2);
-extern PetalNode* petal_sentence_intersection(PetalNode* P1, PetalNode* P2);
-extern PetalNode* petal_sentence_difference(PetalNode* P1, PetalNode* P2);
-extern PetalNode* petal_sentence_symmetric_difference(PetalNode* P1, PetalNode* P2);
-extern int        petal_sentence_is_subset(PetalNode* P1, PetalNode* P2);
-extern int        petal_sentence_is_identical(PetalNode* P1, PetalNode* P2);
+extern int petal_is_subset_of(PetalNode* a, PetalNode* b);
+extern int petal_is_identical(PetalNode* a, PetalNode* b);
 
-/* ============================================================
- *  CONSTANTES ET ETAT GLOBAL
- * ============================================================ */
-#define MAX_ROSES    10
-#define MAX_RESULTATS 20
+#define MAX_ROSES 10
+#define MAX_RESULTS 20
 
 Rose* roses[MAX_ROSES];
-int   nombre_roses = 0;
+int roses_count = 0;
 
-PetalNode* resultats[MAX_RESULTATS];
-char       noms_resultats[MAX_RESULTATS][64];
-int        nombre_resultats = 0;
+PetalNode* results[MAX_RESULTS];
+char results_names[MAX_RESULTS][64];
+int results_count = 0;
 
-/* ============================================================
- *  UTILITAIRES TERMINAL
- * ============================================================ */
-void effacer_ecran() {
+void clear_screen()
+{
     printf("\e[1;1H\e[2J");
 }
 
-void aller_xy(int x, int y) {
+void go_xy(int x, int y)
+{
     printf("\e[%d;%dH", y, x);
 }
 
-void vider_buffer() {
-    int caractere;
-    while ((caractere = getchar()) != '\n' && caractere != EOF);
+void clear_buffer()
+{
+    int c;
+    c = getchar();
+    while (c != '\n' && c != EOF) {
+        c = getchar();
+    }
 }
 
 #ifdef _WIN32
-int lire_touche() {
-    int touche = _getch();
-    if (touche == 224) {
-        touche = _getch();
-        if (touche == 72) return 1000; /* fleche haut */
-        if (touche == 80) return 1001; /* fleche bas  */
+int read_key()
+{
+    int k = _getch();
+    if (k == 224) {
+        k = _getch();
+        if (k == 72) {
+            return 1000;
+        }
+        if (k == 80) {
+            return 1001;
+        }
     }
-    return touche;
+    return k;
 }
 #else
-int lire_touche() {
-    struct termios ancien, nouveau;
-    tcgetattr(STDIN_FILENO, &ancien);
-    nouveau = ancien;
-    nouveau.c_lflag &= ~(ICANON | ECHO);
-    tcsetattr(STDIN_FILENO, TCSANOW, &nouveau);
-    int touche = getchar();
-    if (touche == 27) {
-        getchar(); /* [ */
-        int suivant = getchar();
-        tcsetattr(STDIN_FILENO, TCSANOW, &ancien);
-        if (suivant == 'A') return 1000;
-        if (suivant == 'B') return 1001;
-        return touche;
+int read_key()
+{
+    struct termios old_t, new_t;
+    tcgetattr(STDIN_FILENO, &old_t);
+    new_t = old_t;
+    new_t.c_lflag &= ~(ICANON | ECHO);
+    tcsetattr(STDIN_FILENO, TCSANOW, &new_t);
+    int k = getchar();
+    if (k == 27) {
+        getchar();
+        int nx = getchar();
+        tcsetattr(STDIN_FILENO, TCSANOW, &old_t);
+        if (nx == 'A') {
+            return 1000;
+        }
+        if (nx == 'B') {
+            return 1001;
+        }
+        return k;
     }
-    tcsetattr(STDIN_FILENO, TCSANOW, &ancien);
-    return touche;
+    tcsetattr(STDIN_FILENO, TCSANOW, &old_t);
+    return k;
 }
 #endif
 
-/* ============================================================
- *  LOGO ROSE
- * ============================================================ */
-void afficher_logo() {
+void print_logo()
+{
     char* logo[] = {
         "  RRRRRRR   OOOOOOO    SSSSSSS  EEEEEEE  ",
         "  RR    RR OO     OO  SS        EE       ",
@@ -110,822 +109,904 @@ void afficher_logo() {
         "  RR  RR   OO     OO        SS  EE       ",
         "  RR   RR   OOOOOOO    SSSSSSS  EEEEEEE  "
     };
-    for (int i = 0; i < 5; i++) {
-        aller_xy(20, 2 + i);
-        for (int j = 0; logo[i][j] != '\0'; j++) {
-            if (logo[i][j] != ' ')
+    int i = 0;
+    while (i < 5) {
+        go_xy(20, 2 + i);
+        int j = 0;
+        while (logo[i][j] != '\0') {
+            if (logo[i][j] != ' ') {
                 printf("\e[48;5;204m \e[0m");
-            else
+            }
+            else {
                 printf(" ");
+            }
+            j = j + 1;
         }
+        i = i + 1;
     }
 }
 
-/* ============================================================
- *  MENU NAVIGATION (fleches + entree)
- * ============================================================ */
-int selectionner_menu(char** options, int nombre_options, int colonne, int ligne) {
-    int selection = 0;
-    int touche;
+int select_menu(char** options, int n_options, int col, int line)
+{
+    int sel = 0;
+    int key;
     while (1) {
-        for (int i = 0; i < nombre_options; i++) {
-            aller_xy(colonne, ligne + i);
-            if (i == selection)
+        int i = 0;
+        while (i < n_options) {
+            go_xy(col, line + i);
+            if (i == sel) {
                 printf("\e[7m\e[38;5;204m%s\e[0m", options[i]);
-            else
+            }
+            else {
                 printf("\e[0m%s\e[0m", options[i]);
+            }
+            i = i + 1;
         }
-        touche = lire_touche();
-        if (touche == 1000 || touche == 'w' || touche == 'W') selection--;
-        else if (touche == 1001 || touche == 's' || touche == 'S') selection++;
-        else if (touche == '\r' || touche == '\n') return selection;
-        if (selection < 0)              selection = nombre_options - 1;
-        if (selection >= nombre_options) selection = 0;
+        key = read_key();
+        if (key == 1000 || key == 'w' || key == 'W') {
+            sel = sel - 1;
+        }
+        else if (key == 1001 || key == 's' || key == 'S') {
+            sel = sel + 1;
+        }
+        else if (key == '\r' || key == '\n') {
+            return sel;
+        }
+        if (sel < 0) {
+            sel = n_options - 1;
+        }
+        if (sel >= n_options) {
+            sel = 0;
+        }
     }
 }
 
-/* ============================================================
- *  SEPARATEUR
- * ============================================================ */
-void afficher_separateur(int ligne) {
-    aller_xy(15, ligne);
+void print_separator(int line)
+{
+    go_xy(15, line);
     printf("\e[38;5;204m");
-    for (int i = 0; i < 50; i++) printf("-");
+    int i = 0;
+    while (i < 50) {
+        printf("-");
+        i = i + 1;
+    }
     printf("\e[0m");
 }
 
-/* ============================================================
- *  SELECTION D'UN PETALE
- *  Retourne un petale depuis une rose chargee ou un resultat
- * ============================================================ */
-PetalNode* selectionner_petale(const char* titre) {
-    effacer_ecran();
-    aller_xy(20, 3);
-    printf("\e[38;5;204m--- %s ---\e[0m", titre);
+PetalNode* select_petal(const char* title)
+{
+    clear_screen();
+    go_xy(20, 3);
+    printf("\e[38;5;204m--- %s ---\e[0m", title);
 
-    if (nombre_roses == 0 && nombre_resultats == 0) {
-        aller_xy(15, 6);
-        printf("Aucune rose chargee et aucun resultat disponible.");
-        aller_xy(15, 8);
-        printf("Appuyez sur une touche...");
-        lire_touche();
+    if (roses_count == 0 && results_count == 0) {
+        go_xy(15, 6);
+        printf("No rose loaded and no result available.");
+        go_xy(15, 8);
+        printf("Press a key...");
+        read_key();
         return NULL;
     }
 
-    char* options_source[2] = {
-        "      1. Depuis une rose chargee      ",
-        "      2. Depuis les resultats sauves  "
+    char* source_options[2] = {
+        "      1. From a loaded rose          ",
+        "      2. From saved results          "
     };
-    aller_xy(15, 5);
-    printf("Source du petale :");
-    int choix_source = selectionner_menu(options_source, 2, 18, 7);
+    go_xy(15, 5);
+    printf("Petal source :");
+    int src = select_menu(source_options, 2, 18, 7);
 
-    if (choix_source == 0) {
-        /* selection depuis rose chargee */
-        if (nombre_roses == 0) {
-            aller_xy(15, 12);
-            printf("Aucune rose chargee.");
-            lire_touche();
+    if (src == 0) {
+        if (roses_count == 0) {
+            go_xy(15, 12);
+            printf("No rose loaded.");
+            read_key();
             return NULL;
         }
-        effacer_ecran();
-        aller_xy(20, 3);
-        printf("\e[38;5;204m--- CHOISIR UNE ROSE ---\e[0m");
-        char* liste_roses[MAX_ROSES + 1];
-        char  tampons_roses[MAX_ROSES + 1][70];
-        for (int i = 0; i < nombre_roses; i++) {
-            sprintf(tampons_roses[i], "      %d. %-30s (%d para.)", i + 1, roses[i]->nom, roses[i]->size);
-            liste_roses[i] = tampons_roses[i];
+        clear_screen();
+        go_xy(20, 3);
+        printf("\e[38;5;204m--- PICK A ROSE ---\e[0m");
+        char* roses_list[MAX_ROSES + 1];
+        char roses_buf[MAX_ROSES + 1][70];
+        int i = 0;
+        while (i < roses_count) {
+            sprintf(roses_buf[i], "      %d. %-30s (%d para.)", i + 1, roses[i]->name, roses[i]->size);
+            roses_list[i] = roses_buf[i];
+            i = i + 1;
         }
-        sprintf(tampons_roses[nombre_roses], "      Annuler                                       ");
-        liste_roses[nombre_roses] = tampons_roses[nombre_roses];
-        int choix_rose = selectionner_menu(liste_roses, nombre_roses + 1, 18, 6);
-        if (choix_rose == nombre_roses) return NULL;
-
-        effacer_ecran();
-        aller_xy(20, 3);
-        printf("\e[38;5;204m--- CHOISIR UN PARAGRAPHE ---\e[0m");
-        int   total_para = roses[choix_rose]->size;
-        char* liste_para[101];
-        char  tampons_para[101][40];
-        for (int i = 0; i < total_para && i < 100; i++) {
-            sprintf(tampons_para[i], "      Paragraphe %-3d                ", i + 1);
-            liste_para[i] = tampons_para[i];
-        }
-        int nb_para = (total_para < 100) ? total_para : 100;
-        sprintf(tampons_para[nb_para], "      Annuler                       ");
-        liste_para[nb_para] = tampons_para[nb_para];
-        int choix_para = selectionner_menu(liste_para, nb_para + 1, 18, 6);
-        if (choix_para == nb_para) return NULL;
-        return rose_get_petal(roses[choix_rose], choix_para);
-
-    } else {
-        /* selection depuis resultats */
-        if (nombre_resultats == 0) {
-            aller_xy(15, 12);
-            printf("Aucun resultat sauvegarde.");
-            lire_touche();
+        sprintf(roses_buf[roses_count], "      Cancel                                       ");
+        roses_list[roses_count] = roses_buf[roses_count];
+        int rc = select_menu(roses_list, roses_count + 1, 18, 6);
+        if (rc == roses_count) {
             return NULL;
         }
-        effacer_ecran();
-        aller_xy(20, 3);
-        printf("\e[38;5;204m--- CHOISIR UN RESULTAT ---\e[0m");
-        char* liste_res[MAX_RESULTATS + 1];
-        char  tampons_res[MAX_RESULTATS + 1][70];
-        for (int i = 0; i < nombre_resultats; i++) {
-            sprintf(tampons_res[i], "      [R%d] %-40s", i + 1, noms_resultats[i]);
-            liste_res[i] = tampons_res[i];
+
+        clear_screen();
+        go_xy(20, 3);
+        printf("\e[38;5;204m--- PICK A PARAGRAPH ---\e[0m");
+        int total = roses[rc]->size;
+        char* para_list[101];
+        char para_buf[101][40];
+        int max_show = total;
+        if (max_show > 100) {
+            max_show = 100;
         }
-        sprintf(tampons_res[nombre_resultats], "      Annuler                                          ");
-        liste_res[nombre_resultats] = tampons_res[nombre_resultats];
-        int choix_res = selectionner_menu(liste_res, nombre_resultats + 1, 18, 6);
-        if (choix_res == nombre_resultats) return NULL;
-        return resultats[choix_res];
+        int j = 0;
+        while (j < max_show) {
+            sprintf(para_buf[j], "      Paragraph %-3d                ", j + 1);
+            para_list[j] = para_buf[j];
+            j = j + 1;
+        }
+        sprintf(para_buf[max_show], "      Cancel                       ");
+        para_list[max_show] = para_buf[max_show];
+        int pc = select_menu(para_list, max_show + 1, 18, 6);
+        if (pc == max_show) {
+            return NULL;
+        }
+        return rose_get_petal(roses[rc], pc);
     }
+
+    if (results_count == 0) {
+        go_xy(15, 12);
+        printf("No saved result.");
+        read_key();
+        return NULL;
+    }
+    clear_screen();
+    go_xy(20, 3);
+    printf("\e[38;5;204m--- PICK A RESULT ---\e[0m");
+    char* res_list[MAX_RESULTS + 1];
+    char res_buf[MAX_RESULTS + 1][70];
+    int k = 0;
+    while (k < results_count) {
+        sprintf(res_buf[k], "      [R%d] %-40s", k + 1, results_names[k]);
+        res_list[k] = res_buf[k];
+        k = k + 1;
+    }
+    sprintf(res_buf[results_count], "      Cancel                                          ");
+    res_list[results_count] = res_buf[results_count];
+    int choice = select_menu(res_list, results_count + 1, 18, 6);
+    if (choice == results_count) {
+        return NULL;
+    }
+    return results[choice];
 }
 
-/* ============================================================
- *  SAUVEGARDER OU ABANDONNER UN RESULTAT
- * ============================================================ */
-void sauvegarder_ou_abandonner(PetalNode* resultat) {
-    if (!resultat) return;
-    effacer_ecran();
-    aller_xy(20, 3);
-    printf("\e[38;5;204m--- RESULTAT ---\e[0m");
-    aller_xy(15, 5);
-    petal_print_by_alpha(resultat);
-
-    afficher_separateur(20);
-    char* options[2] = {
-        "      Sauvegarder ce resultat         ",
-        "      Abandonner                      "
-    };
-    int choix = selectionner_menu(options, 2, 18, 22);
-    if (choix == 0) {
-        if (nombre_resultats >= MAX_RESULTATS) {
-            aller_xy(15, 25);
-            printf("Limite de resultats atteinte.");
-            lire_touche();
-            petal_free(resultat);
-            return;
-        }
-        effacer_ecran();
-        aller_xy(20, 5);
-        printf("Nom du resultat : ");
-        scanf(" %63[^\n]", noms_resultats[nombre_resultats]);
-        vider_buffer();
-        resultats[nombre_resultats] = resultat;
-        nombre_resultats++;
-        aller_xy(15, 8);
-        printf("\e[38;5;204mResultat sauvegarde avec succes.\e[0m");
-        lire_touche();
-    } else {
-        petal_free(resultat);
-        aller_xy(15, 25);
-        printf("Resultat abandonne.");
-        lire_touche();
-    }
-}
-
-/* ============================================================
- *  [1] CHARGER UN FICHIER
- * ============================================================ */
-void menu_charger_fichier() {
-    if (nombre_roses >= MAX_ROSES) {
-        effacer_ecran();
-        aller_xy(20, 8);
-        printf("\e[38;5;196mLimite de roses atteinte (%d/%d).\e[0m", nombre_roses, MAX_ROSES);
-        lire_touche();
+void save_or_discard(PetalNode* result)
+{
+    if (result == NULL) {
         return;
     }
-    effacer_ecran();
-    aller_xy(20, 3);
-    printf("\e[38;5;204m--- CHARGER UN FICHIER ---\e[0m");
-    aller_xy(15, 6);
-    printf("Chemin du fichier (.txt) : ");
-    char nom_fichier[256];
-    scanf(" %255[^\n]", nom_fichier);
-    vider_buffer();
+    clear_screen();
+    go_xy(20, 3);
+    printf("\e[38;5;204m--- RESULT ---\e[0m");
+    go_xy(15, 5);
+    petal_print_by_alpha(result);
 
-    FILE* test = fopen(nom_fichier, "r");
-    if (!test) {
-        aller_xy(15, 9);
-        printf("\e[38;5;196mErreur : fichier introuvable.\e[0m");
-        lire_touche();
+    print_separator(20);
+    char* options[2] = {
+        "      Save this result                ",
+        "      Discard                         "
+    };
+    int choice = select_menu(options, 2, 18, 22);
+    if (choice == 0) {
+        if (results_count >= MAX_RESULTS) {
+            go_xy(15, 25);
+            printf("Result limit reached.");
+            read_key();
+            petal_free(result);
+            return;
+        }
+        clear_screen();
+        go_xy(20, 5);
+        printf("Result name: ");
+        scanf(" %63[^\n]", results_names[results_count]);
+        clear_buffer();
+        results[results_count] = result;
+        results_count = results_count + 1;
+        go_xy(15, 8);
+        printf("\e[38;5;204mResult saved.\e[0m");
+        read_key();
+    }
+    else {
+        petal_free(result);
+        go_xy(15, 25);
+        printf("Result discarded.");
+        read_key();
+    }
+}
+
+void menu_load_file()
+{
+    if (roses_count >= MAX_ROSES) {
+        clear_screen();
+        go_xy(20, 8);
+        printf("\e[38;5;196mRose limit reached (%d/%d).\e[0m", roses_count, MAX_ROSES);
+        read_key();
+        return;
+    }
+    clear_screen();
+    go_xy(20, 3);
+    printf("\e[38;5;204m--- LOAD A FILE ---\e[0m");
+    go_xy(15, 6);
+    printf("File path (.txt): ");
+    char filename[256];
+    scanf(" %255[^\n]", filename);
+    clear_buffer();
+
+    FILE* test = fopen(filename, "r");
+    if (test == NULL) {
+        go_xy(15, 9);
+        printf("\e[38;5;196mError: file not found.\e[0m");
+        read_key();
         return;
     }
     fclose(test);
 
-    Rose* nouvelle_rose = charger_fichier(nom_fichier);
-    if (!nouvelle_rose) {
-        aller_xy(15, 9);
-        printf("\e[38;5;196mEchec du chargement.\e[0m");
-        lire_touche();
+    Rose* new_rose = load_file(filename);
+    if (new_rose == NULL) {
+        go_xy(15, 9);
+        printf("\e[38;5;196mLoad failed.\e[0m");
+        read_key();
         return;
     }
 
-    roses[nombre_roses] = nouvelle_rose;
-    nombre_roses++;
-    aller_xy(15, 9);
-    printf("\e[38;5;204mFichier charge avec succes !\e[0m");
-    aller_xy(15, 10);
-    printf("Nombre de paragraphes detectes : %d", nouvelle_rose->size);
-    aller_xy(15, 11);
-    printf("Nombre total de mots : %d", rose_total_word_count(nouvelle_rose));
-    aller_xy(15, 13);
-    printf("Appuyez sur une touche pour continuer...");
-    lire_touche();
+    roses[roses_count] = new_rose;
+    roses_count = roses_count + 1;
+    go_xy(15, 9);
+    printf("\e[38;5;204mFile loaded successfully.\e[0m");
+    go_xy(15, 10);
+    printf("Paragraphs detected: %d", new_rose->size);
+    go_xy(15, 11);
+    printf("Total words: %d", rose_total_word_count(new_rose));
+    go_xy(15, 13);
+    printf("Press a key to continue...");
+    read_key();
 }
 
-/* ============================================================
- *  [2] AFFICHAGE
- * ============================================================ */
-void menu_affichage_rose_complete() {
-    if (nombre_roses == 0) {
-        effacer_ecran();
-        aller_xy(20, 8);
-        printf("Aucune rose chargee.");
-        lire_touche();
+void menu_display_full_rose()
+{
+    if (roses_count == 0) {
+        clear_screen();
+        go_xy(20, 8);
+        printf("No rose loaded.");
+        read_key();
         return;
     }
-    effacer_ecran();
-    aller_xy(20, 3);
-    printf("\e[38;5;204m--- CHOISIR UNE ROSE ---\e[0m");
-    char* liste[MAX_ROSES + 1];
-    char  tampons[MAX_ROSES + 1][70];
-    for (int i = 0; i < nombre_roses; i++) {
-        sprintf(tampons[i], "      %d. %-35s", i + 1, roses[i]->nom);
-        liste[i] = tampons[i];
+    clear_screen();
+    go_xy(20, 3);
+    printf("\e[38;5;204m--- PICK A ROSE ---\e[0m");
+    char* list[MAX_ROSES + 1];
+    char buf[MAX_ROSES + 1][70];
+    int i = 0;
+    while (i < roses_count) {
+        sprintf(buf[i], "      %d. %-35s", i + 1, roses[i]->name);
+        list[i] = buf[i];
+        i = i + 1;
     }
-    sprintf(tampons[nombre_roses], "      Retour                                       ");
-    liste[nombre_roses] = tampons[nombre_roses];
-    int choix_rose = selectionner_menu(liste, nombre_roses + 1, 18, 6);
-    if (choix_rose == nombre_roses) return;
+    sprintf(buf[roses_count], "      Back                                       ");
+    list[roses_count] = buf[roses_count];
+    int rc = select_menu(list, roses_count + 1, 18, 6);
+    if (rc == roses_count) {
+        return;
+    }
 
-    char* options_affichage[3] = {
-        "      Par position (texte original)   ",
-        "      Par ordre alphabetique          ",
-        "      Retour                          "
+    char* opts[3] = {
+        "      By position (text order)        ",
+        "      By alphabet                     ",
+        "      Back                            "
     };
-    int retour = 0;
-    while (!retour) {
-        effacer_ecran();
-        aller_xy(20, 3);
-        printf("\e[38;5;204m--- AFFICHAGE : %s ---\e[0m", roses[choix_rose]->nom);
-        int choix = selectionner_menu(options_affichage, 3, 18, 6);
-        if (choix == 2) { retour = 1; continue; }
-        effacer_ecran();
-        PetalNode* courant = roses[choix_rose]->petals;
-        int        index   = 0;
+    int back = 0;
+    while (back == 0) {
+        clear_screen();
+        go_xy(20, 3);
+        printf("\e[38;5;204m--- DISPLAY: %s ---\e[0m", roses[rc]->name);
+        int choice = select_menu(opts, 3, 18, 6);
+        if (choice == 2) {
+            back = 1;
+            continue;
+        }
+        clear_screen();
+        PetalNode* cur = roses[rc]->petals;
+        int idx = 0;
         do {
-            printf("\n\e[38;5;204m  === Paragraphe %d ===\e[0m\n", index + 1);
-            if (choix == 0) petal_print_by_position(courant);
-            else            petal_print_by_alpha(courant);
-            courant = courant->next;
-            index++;
-        } while (courant != roses[choix_rose]->petals);
-        printf("\n  Appuyez sur une touche...");
-        lire_touche();
+            printf("\n\e[38;5;204m  === Paragraph %d ===\e[0m\n", idx + 1);
+            if (choice == 0) {
+                petal_print_by_position(cur);
+            }
+            else {
+                petal_print_by_alpha(cur);
+            }
+            cur = cur->next;
+            idx = idx + 1;
+        } while (cur != roses[rc]->petals);
+        printf("\n  Press a key...");
+        read_key();
     }
 }
 
-void menu_affichage_paragraphe_unique() {
-    PetalNode* petale = selectionner_petale("CHOISIR UN PARAGRAPHE");
-    if (!petale) return;
-
-    char* options[4] = {
-        "      Par position                    ",
-        "      Par ordre alphabetique          ",
-        "      Par phrases                     ",
-        "      Retour                          "
+void menu_display_single_paragraph()
+{
+    PetalNode* p = select_petal("PICK A PARAGRAPH");
+    if (p == NULL) {
+        return;
+    }
+    char* opts[3] = {
+        "      By position                     ",
+        "      By alphabet                     ",
+        "      Back                            "
     };
-    int retour = 0;
-    while (!retour) {
-        effacer_ecran();
-        aller_xy(20, 3);
-        printf("\e[38;5;204m--- AFFICHAGE DU PARAGRAPHE ---\e[0m");
-        int choix = selectionner_menu(options, 4, 18, 6);
-        effacer_ecran();
-        switch (choix) {
-            case 0: petal_print_by_position(petale); break;
-            case 1: petal_print_by_alpha(petale);    break;
-            case 2: petal_print_sentences(petale);   break;
-            case 3: retour = 1; continue;
+    int back = 0;
+    while (back == 0) {
+        clear_screen();
+        go_xy(20, 3);
+        printf("\e[38;5;204m--- DISPLAY PARAGRAPH ---\e[0m");
+        int choice = select_menu(opts, 3, 18, 6);
+        clear_screen();
+        if (choice == 0) {
+            petal_print_by_position(p);
         }
-        printf("\n  Appuyez sur une touche...");
-        lire_touche();
+        else if (choice == 1) {
+            petal_print_by_alpha(p);
+        }
+        else {
+            back = 1;
+            continue;
+        }
+        printf("\n  Press a key...");
+        read_key();
     }
 }
 
-void menu_statistiques() {
-    char* options[4] = {
-        "      Statistiques d'un paragraphe    ",
-        "      Resume complet (toute la rose)  ",
-        "      Frequence des mots (rose)       ",
-        "      Retour                          "
+void menu_statistics()
+{
+    char* opts[4] = {
+        "      Stats of one paragraph          ",
+        "      Full rose summary               ",
+        "      Word frequency table            ",
+        "      Back                            "
     };
-    int retour = 0;
-    while (!retour) {
-        effacer_ecran();
-        aller_xy(20, 3);
-        printf("\e[38;5;204m--- STATISTIQUES ---\e[0m");
-        int choix = selectionner_menu(options, 4, 18, 6);
-        if (choix == 3) { retour = 1; continue; }
-
-        if (choix == 0) {
-            PetalNode* petale = selectionner_petale("STATISTIQUES DU PARAGRAPHE");
-            if (!petale) continue;
-            effacer_ecran();
-            aller_xy(20, 3);
-            printf("\e[38;5;204m--- STATISTIQUES ---\e[0m\n\n");
-            petal_print_stats(petale);
-            printf("\n  Appuyez sur une touche...");
-            lire_touche();
-        } else if (choix == 1) {
-            if (nombre_roses == 0) {
-                effacer_ecran();
-                aller_xy(15, 8);
-                printf("Aucune rose chargee.");
-                lire_touche();
+    int back = 0;
+    while (back == 0) {
+        clear_screen();
+        go_xy(20, 3);
+        printf("\e[38;5;204m--- STATISTICS ---\e[0m");
+        int choice = select_menu(opts, 4, 18, 6);
+        if (choice == 3) {
+            back = 1;
+            continue;
+        }
+        if (choice == 0) {
+            PetalNode* p = select_petal("PARAGRAPH STATS");
+            if (p == NULL) {
                 continue;
             }
-            effacer_ecran();
-            aller_xy(20, 3);
-            printf("\e[38;5;204m--- CHOISIR UNE ROSE ---\e[0m");
-            char* liste[MAX_ROSES + 1];
-            char  tampons[MAX_ROSES + 1][70];
-            for (int i = 0; i < nombre_roses; i++) {
-                sprintf(tampons[i], "      %d. %-35s", i + 1, roses[i]->nom);
-                liste[i] = tampons[i];
+            clear_screen();
+            go_xy(20, 3);
+            printf("\e[38;5;204m--- STATS ---\e[0m\n\n");
+            petal_print_stats(p);
+            printf("\n  Press a key...");
+            read_key();
+        }
+        else if (choice == 1) {
+            if (roses_count == 0) {
+                clear_screen();
+                go_xy(15, 8);
+                printf("No rose loaded.");
+                read_key();
+                continue;
             }
-            sprintf(tampons[nombre_roses], "      Retour                                       ");
-            liste[nombre_roses] = tampons[nombre_roses];
-            int choix_rose = selectionner_menu(liste, nombre_roses + 1, 18, 6);
-            if (choix_rose == nombre_roses) continue;
-            effacer_ecran();
-            printf("\n\e[38;5;204m  === Resume de : %s ===\e[0m\n\n", roses[choix_rose]->nom);
-            printf("  %-12s %-10s %-10s %-10s %-20s\n", "Paragraphe", "Mots", "Uniques", "Phrases", "Plus frequent");
-            printf("  %-12s %-10s %-10s %-10s %-20s\n", "----------", "----", "-------", "-------", "-------------");
-            PetalNode* courant = roses[choix_rose]->petals;
-            int        index   = 0;
+            clear_screen();
+            go_xy(20, 3);
+            printf("\e[38;5;204m--- PICK A ROSE ---\e[0m");
+            char* list[MAX_ROSES + 1];
+            char buf[MAX_ROSES + 1][70];
+            int i = 0;
+            while (i < roses_count) {
+                sprintf(buf[i], "      %d. %-35s", i + 1, roses[i]->name);
+                list[i] = buf[i];
+                i = i + 1;
+            }
+            sprintf(buf[roses_count], "      Back                                       ");
+            list[roses_count] = buf[roses_count];
+            int rc = select_menu(list, roses_count + 1, 18, 6);
+            if (rc == roses_count) {
+                continue;
+            }
+            clear_screen();
+            printf("\n\e[38;5;204m  === Summary of: %s ===\e[0m\n\n", roses[rc]->name);
+            printf("  %-12s %-10s %-10s %-20s\n", "Paragraph", "Words", "Unique", "Most frequent");
+            printf("  %-12s %-10s %-10s %-20s\n", "---------", "-----", "------", "-------------");
+            PetalNode* cur = roses[rc]->petals;
+            int idx = 0;
             do {
-                int   tw  = petal_word_count(courant);
-                int   sc  = petal_sentence_count(courant);
-                char* mf  = petal_most_frequent_word(courant);
-                printf("  %-12d %-10d %-10d %-10d %-20s\n", index + 1, tw, sc, sc, mf ? mf : "N/A");
-                courant = courant->next;
-                index++;
-            } while (courant != roses[choix_rose]->petals);
-            printf("\n  Appuyez sur une touche...");
-            lire_touche();
-        } else if (choix == 2) {
-            PetalNode* petale = selectionner_petale("TABLE DE FREQUENCE");
-            if (!petale) continue;
-            effacer_ecran();
-            aller_xy(20, 3);
-            printf("\e[38;5;204m--- TABLE DE FREQUENCE ---\e[0m\n\n");
-            petal_print_frequency_table(petale);
-            printf("\n  Appuyez sur une touche...");
-            lire_touche();
+                int tw = petal_word_count(cur);
+                int uw = petal_unique_word_count(cur);
+                char* mf = petal_most_frequent_word(cur);
+                if (mf == NULL) {
+                    mf = "N/A";
+                }
+                printf("  %-12d %-10d %-10d %-20s\n", idx + 1, tw, uw, mf);
+                cur = cur->next;
+                idx = idx + 1;
+            } while (cur != roses[rc]->petals);
+            printf("\n  Press a key...");
+            read_key();
         }
-    }
-}
-
-void menu_affichage() {
-    char* options[4] = {
-        "      1. Rose complete                ",
-        "      2. Paragraphe unique            ",
-        "      3. Statistiques                 ",
-        "      4. Retour                       "
-    };
-    int retour = 0;
-    while (!retour) {
-        effacer_ecran();
-        aller_xy(20, 3);
-        printf("\e[38;5;204m--- AFFICHAGE ---\e[0m");
-        int choix = selectionner_menu(options, 4, 18, 6);
-        switch (choix) {
-            case 0: menu_affichage_rose_complete();    break;
-            case 1: menu_affichage_paragraphe_unique();break;
-            case 2: menu_statistiques();               break;
-            case 3: retour = 1;                        break;
-        }
-    }
-}
-
-/* ============================================================
- *  [3] RECHERCHE
- * ============================================================ */
-void menu_recherche() {
-    char* options[4] = {
-        "      1. Mot a une position locale    ",
-        "      2. Mot dans tous les paragraphes",
-        "      3. Retour                       "
-    };
-    int retour = 0;
-    while (!retour) {
-        effacer_ecran();
-        aller_xy(20, 3);
-        printf("\e[38;5;204m--- RECHERCHE ---\e[0m");
-        int choix = selectionner_menu(options, 3, 18, 6);
-
-        if (choix == 2) { retour = 1; continue; }
-
-        if (choix == 0) {
-            PetalNode* petale = selectionner_petale("CHOISIR UN PARAGRAPHE");
-            if (!petale) continue;
-            effacer_ecran();
-            aller_xy(20, 3);
-            printf("\e[38;5;204m--- MOT A UNE POSITION ---\e[0m");
-            aller_xy(15, 6);
-            printf("Nombre de mots dans ce paragraphe : %d", petal_word_count(petale));
-            aller_xy(15, 8);
-            printf("Entrez la position (1 a %d) : ", petal_word_count(petale));
-            int position;
-            scanf("%d", &position);
-            vider_buffer();
-            char* mot = petal_word_at_pos(petale, position);
-            aller_xy(15, 10);
-            if (mot)
-                printf("\e[38;5;204mMot a la position %d : %s\e[0m", position, mot);
-            else
-                printf("\e[38;5;196mPosition invalide.\e[0m");
-            aller_xy(15, 12);
-            printf("Appuyez sur une touche...");
-            lire_touche();
-
-        } else if (choix == 1) {
-            if (nombre_roses == 0) {
-                effacer_ecran();
-                aller_xy(15, 8);
-                printf("Aucune rose chargee.");
-                lire_touche();
+        else if (choice == 2) {
+            PetalNode* p = select_petal("FREQUENCY TABLE");
+            if (p == NULL) {
                 continue;
             }
-            effacer_ecran();
-            aller_xy(20, 3);
-            printf("\e[38;5;204m--- CHOISIR UNE ROSE ---\e[0m");
-            char* liste[MAX_ROSES + 1];
-            char  tampons[MAX_ROSES + 1][70];
-            for (int i = 0; i < nombre_roses; i++) {
-                sprintf(tampons[i], "      %d. %-35s", i + 1, roses[i]->nom);
-                liste[i] = tampons[i];
+            clear_screen();
+            go_xy(20, 3);
+            printf("\e[38;5;204m--- FREQUENCY TABLE ---\e[0m\n\n");
+            petal_print_frequency_table(p);
+            printf("\n  Press a key...");
+            read_key();
+        }
+    }
+}
+
+void menu_display()
+{
+    char* opts[4] = {
+        "      1. Full rose                    ",
+        "      2. Single paragraph             ",
+        "      3. Statistics                   ",
+        "      4. Back                         "
+    };
+    int back = 0;
+    while (back == 0) {
+        clear_screen();
+        go_xy(20, 3);
+        printf("\e[38;5;204m--- DISPLAY ---\e[0m");
+        int choice = select_menu(opts, 4, 18, 6);
+        if (choice == 0) {
+            menu_display_full_rose();
+        }
+        else if (choice == 1) {
+            menu_display_single_paragraph();
+        }
+        else if (choice == 2) {
+            menu_statistics();
+        }
+        else {
+            back = 1;
+        }
+    }
+}
+
+void menu_search()
+{
+    char* opts[3] = {
+        "      1. Word at local position       ",
+        "      2. Word in all paragraphs       ",
+        "      3. Back                         "
+    };
+    int back = 0;
+    while (back == 0) {
+        clear_screen();
+        go_xy(20, 3);
+        printf("\e[38;5;204m--- SEARCH ---\e[0m");
+        int choice = select_menu(opts, 3, 18, 6);
+
+        if (choice == 2) {
+            back = 1;
+            continue;
+        }
+
+        if (choice == 0) {
+            PetalNode* p = select_petal("PICK A PARAGRAPH");
+            if (p == NULL) {
+                continue;
             }
-            sprintf(tampons[nombre_roses], "      Retour                                       ");
-            liste[nombre_roses] = tampons[nombre_roses];
-            int choix_rose = selectionner_menu(liste, nombre_roses + 1, 18, 6);
-            if (choix_rose == nombre_roses) continue;
-
-            effacer_ecran();
-            aller_xy(20, 3);
-            printf("\e[38;5;204m--- RECHERCHER UN MOT ---\e[0m");
-            aller_xy(15, 6);
-            printf("Mot a rechercher : ");
-            char mot_cherche[128];
-            scanf(" %127[^\n]", mot_cherche);
-            vider_buffer();
-            effacer_ecran();
-            aller_xy(20, 3);
-            printf("\e[38;5;204m--- RESULTATS POUR '%s' ---\e[0m\n\n", mot_cherche);
-            rose_find_petals_with_word(roses[choix_rose], mot_cherche);
-            printf("\n  Appuyez sur une touche...");
-            lire_touche();
+            clear_screen();
+            go_xy(20, 3);
+            printf("\e[38;5;204m--- WORD AT POSITION ---\e[0m");
+            go_xy(15, 6);
+            printf("Words in this paragraph: %d", petal_word_count(p));
+            go_xy(15, 8);
+            printf("Position (1 to %d): ", petal_word_count(p));
+            int pos;
+            scanf("%d", &pos);
+            clear_buffer();
+            char* w = petal_word_at_pos(p, pos);
+            go_xy(15, 10);
+            if (w != NULL) {
+                printf("\e[38;5;204mWord at %d: %s\e[0m", pos, w);
+            }
+            else {
+                printf("\e[38;5;196mInvalid position.\e[0m");
+            }
+            go_xy(15, 12);
+            printf("Press a key...");
+            read_key();
+        }
+        else {
+            if (roses_count == 0) {
+                clear_screen();
+                go_xy(15, 8);
+                printf("No rose loaded.");
+                read_key();
+                continue;
+            }
+            clear_screen();
+            go_xy(20, 3);
+            printf("\e[38;5;204m--- PICK A ROSE ---\e[0m");
+            char* list[MAX_ROSES + 1];
+            char buf[MAX_ROSES + 1][70];
+            int i = 0;
+            while (i < roses_count) {
+                sprintf(buf[i], "      %d. %-35s", i + 1, roses[i]->name);
+                list[i] = buf[i];
+                i = i + 1;
+            }
+            sprintf(buf[roses_count], "      Back                                       ");
+            list[roses_count] = buf[roses_count];
+            int rc = select_menu(list, roses_count + 1, 18, 6);
+            if (rc == roses_count) {
+                continue;
+            }
+            clear_screen();
+            go_xy(20, 3);
+            printf("\e[38;5;204m--- SEARCH WORD ---\e[0m");
+            go_xy(15, 6);
+            printf("Word: ");
+            char target[128];
+            scanf(" %127[^\n]", target);
+            clear_buffer();
+            int j = 0;
+            while (target[j] != '\0') {
+                if (target[j] >= 'A' && target[j] <= 'Z') {
+                    target[j] = target[j] + ('a' - 'A');
+                }
+                j = j + 1;
+            }
+            clear_screen();
+            go_xy(20, 3);
+            printf("\e[38;5;204m--- RESULTS FOR '%s' ---\e[0m\n\n", target);
+            rose_find_petals_with_word(roses[rc], target);
+            printf("\n  Press a key...");
+            read_key();
         }
     }
 }
 
-/* ============================================================
- *  FONCTION GENERIQUE POUR LES OPERATIONS ENSEMBLISTES
- * ============================================================ */
-void executer_operation(int type_operation, int mode_phrase) {
-    effacer_ecran();
-    aller_xy(20, 3);
-    printf("\e[38;5;204m--- SELECTION DU PETALE A ---\e[0m");
-    PetalNode* petale_a = selectionner_petale("PETALE A");
-    if (!petale_a) return;
-
-    effacer_ecran();
-    aller_xy(20, 3);
-    printf("\e[38;5;204m--- SELECTION DU PETALE B ---\e[0m");
-    PetalNode* petale_b = selectionner_petale("PETALE B");
-    if (!petale_b) return;
-
-    PetalNode* resultat = NULL;
-
-    if (!mode_phrase) {
-        /* operations sur mots */
-        switch (type_operation) {
-            case 0: resultat = petal_union(petale_a, petale_b);                break;
-            case 1: resultat = petal_intersection(petale_a, petale_b);         break;
-            case 2: resultat = petal_difference(petale_a, petale_b);           break;
-            case 3: resultat = petal_symmetric_difference(petale_a, petale_b); break;
-            case 4:
-                effacer_ecran();
-                aller_xy(20, 5);
-                printf("\e[38;5;204m--- RESULTAT SOUS-ENSEMBLE ---\e[0m");
-                aller_xy(15, 8);
-                if (petal_is_subset_of(petale_a, petale_b))
-                    printf("\e[38;5;204mA est un sous-ensemble de B : VRAI\e[0m");
-                else
-                    printf("\e[38;5;196mA est un sous-ensemble de B : FAUX\e[0m");
-                aller_xy(15, 10);
-                printf("Appuyez sur une touche...");
-                lire_touche();
-                return;
-        }
-    } else {
-        /* operations sur phrases */
-        switch (type_operation) {
-            case 0: resultat = petal_sentence_union(petale_a, petale_b);                break;
-            case 1: resultat = petal_sentence_intersection(petale_a, petale_b);         break;
-            case 2: resultat = petal_sentence_difference(petale_a, petale_b);           break;
-            case 3: resultat = petal_sentence_symmetric_difference(petale_a, petale_b); break;
-            case 4:
-                effacer_ecran();
-                aller_xy(20, 5);
-                printf("\e[38;5;204m--- RESULTAT SOUS-ENSEMBLE PHRASES ---\e[0m");
-                aller_xy(15, 8);
-                if (petal_sentence_is_subset(petale_a, petale_b))
-                    printf("\e[38;5;204mA est un sous-ensemble de B : VRAI\e[0m");
-                else
-                    printf("\e[38;5;196mA est un sous-ensemble de B : FAUX\e[0m");
-                aller_xy(15, 10);
-                printf("Appuyez sur une touche...");
-                lire_touche();
-                return;
-        }
+void run_word_op(int op_type)
+{
+    clear_screen();
+    go_xy(20, 3);
+    printf("\e[38;5;204m--- PICK PETAL A ---\e[0m");
+    PetalNode* a = select_petal("PETAL A");
+    if (a == NULL) {
+        return;
+    }
+    clear_screen();
+    go_xy(20, 3);
+    printf("\e[38;5;204m--- PICK PETAL B ---\e[0m");
+    PetalNode* b = select_petal("PETAL B");
+    if (b == NULL) {
+        return;
     }
 
-    if (resultat) sauvegarder_ou_abandonner(resultat);
+    PetalNode* res = NULL;
+
+    if (op_type == 0) {
+        res = petal_union(a, b);
+    }
+    else if (op_type == 1) {
+        res = petal_intersection(a, b);
+    }
+    else if (op_type == 2) {
+        res = petal_difference(a, b);
+    }
+    else if (op_type == 3) {
+        res = petal_symmetric_difference(a, b);
+    }
+    else if (op_type == 4) {
+        clear_screen();
+        go_xy(20, 5);
+        printf("\e[38;5;204m--- SUBSET CHECK ---\e[0m");
+        go_xy(15, 8);
+        int sub = petal_is_subset_of(a, b);
+        int id = petal_is_identical(a, b);
+        if (id == 1) {
+            printf("\e[38;5;204mA and B are identical.\e[0m");
+        }
+        else if (sub == 1) {
+            printf("\e[38;5;204mA is a subset of B: TRUE\e[0m");
+        }
+        else {
+            printf("\e[38;5;196mA is a subset of B: FALSE\e[0m");
+        }
+        go_xy(15, 10);
+        printf("Press a key...");
+        read_key();
+        return;
+    }
+
+    if (res != NULL) {
+        save_or_discard(res);
+    }
 }
 
-/* ============================================================
- *  [4] OPERATIONS SUR MOTS
- * ============================================================ */
-void menu_operations_mots() {
-    char* options[6] = {
+void menu_word_operations()
+{
+    char* opts[6] = {
         "      1. Union          (A U B)       ",
         "      2. Intersection   (A n B)       ",
         "      3. Difference     (A \\ B)      ",
-        "      4. Diff. Symetrique (A D B)     ",
-        "      5. Sous-ensemble  (A c B ?)     ",
-        "      6. Retour                       "
+        "      4. Sym. Diff      (A D B)       ",
+        "      5. Subset check   (A c B ?)     ",
+        "      6. Back                         "
     };
-    int retour = 0;
-    while (!retour) {
-        effacer_ecran();
-        aller_xy(20, 3);
-        printf("\e[38;5;204m--- OPERATIONS SUR MOTS ---\e[0m");
-        int choix = selectionner_menu(options, 6, 18, 6);
-        if (choix == 5) { retour = 1; continue; }
-        executer_operation(choix, 0);
+    int back = 0;
+    while (back == 0) {
+        clear_screen();
+        go_xy(20, 3);
+        printf("\e[38;5;204m--- WORD OPERATIONS ---\e[0m");
+        int choice = select_menu(opts, 6, 18, 6);
+        if (choice == 5) {
+            back = 1;
+            continue;
+        }
+        run_word_op(choice);
     }
 }
 
-/* ============================================================
- *  [5] OPERATIONS SUR PHRASES
- * ============================================================ */
-void menu_operations_phrases() {
-    char* options[6] = {
-        "      1. Union de phrases             ",
-        "      2. Intersection de phrases      ",
-        "      3. Difference de phrases        ",
-        "      4. Diff. Symetrique de phrases  ",
-        "      5. Sous-ensemble de phrases     ",
-        "      6. Retour                       "
-    };
-    int retour = 0;
-    while (!retour) {
-        effacer_ecran();
-        aller_xy(20, 3);
-        printf("\e[38;5;204m--- OPERATIONS SUR PHRASES ---\e[0m");
-        int choix = selectionner_menu(options, 6, 18, 6);
-        if (choix == 5) { retour = 1; continue; }
-        executer_operation(choix, 1);
-    }
-}
+void menu_results()
+{
+    int back = 0;
+    while (back == 0) {
+        clear_screen();
+        go_xy(20, 3);
+        printf("\e[38;5;204m--- SAVED RESULTS (%d/%d) ---\e[0m", results_count, MAX_RESULTS);
 
-/* ============================================================
- *  [6] RESULTATS SAUVEGARDES
- * ============================================================ */
-void menu_resultats() {
-    int retour = 0;
-    while (!retour) {
-        effacer_ecran();
-        aller_xy(20, 3);
-        printf("\e[38;5;204m--- RESULTATS SAUVEGARDES (%d/%d) ---\e[0m", nombre_resultats, MAX_RESULTATS);
-
-        if (nombre_resultats == 0) {
-            aller_xy(15, 6);
-            printf("Aucun resultat sauvegarde.");
-            aller_xy(15, 8);
-            printf("Appuyez sur une touche...");
-            lire_touche();
+        if (results_count == 0) {
+            go_xy(15, 6);
+            printf("No saved result.");
+            go_xy(15, 8);
+            printf("Press a key...");
+            read_key();
             return;
         }
 
-        char* liste[MAX_RESULTATS + 1];
-        char  tampons[MAX_RESULTATS + 1][70];
-        for (int i = 0; i < nombre_resultats; i++) {
-            sprintf(tampons[i], "      [R%d] %-40s", i + 1, noms_resultats[i]);
-            liste[i] = tampons[i];
+        char* list[MAX_RESULTS + 1];
+        char buf[MAX_RESULTS + 1][70];
+        int i = 0;
+        while (i < results_count) {
+            sprintf(buf[i], "      [R%d] %-40s", i + 1, results_names[i]);
+            list[i] = buf[i];
+            i = i + 1;
         }
-        sprintf(tampons[nombre_resultats], "      Retour                                          ");
-        liste[nombre_resultats] = tampons[nombre_resultats];
+        sprintf(buf[results_count], "      Back                                          ");
+        list[results_count] = buf[results_count];
 
-        int choix = selectionner_menu(liste, nombre_resultats + 1, 18, 6);
-        if (choix == nombre_resultats) { retour = 1; continue; }
+        int choice = select_menu(list, results_count + 1, 18, 6);
+        if (choice == results_count) {
+            back = 1;
+            continue;
+        }
 
-        /* actions sur le resultat selectionne */
         char* actions[3] = {
-            "      Afficher ce resultat            ",
-            "      Supprimer ce resultat           ",
-            "      Retour                          "
+            "      Show this result                ",
+            "      Delete this result              ",
+            "      Back                            "
         };
-        int retour_action = 0;
-        while (!retour_action) {
-            effacer_ecran();
-            aller_xy(20, 3);
-            printf("\e[38;5;204m--- %s ---\e[0m", noms_resultats[choix]);
-            int action = selectionner_menu(actions, 3, 18, 6);
-            if (action == 2) { retour_action = 1; continue; }
-            if (action == 0) {
-                effacer_ecran();
-                aller_xy(20, 3);
-                printf("\e[38;5;204m--- RESULTAT : %s ---\e[0m\n\n", noms_resultats[choix]);
-                petal_print_by_alpha(resultats[choix]);
-                printf("\n  Appuyez sur une touche...");
-                lire_touche();
-            } else if (action == 1) {
-                petal_free(resultats[choix]);
-                for (int k = choix; k < nombre_resultats - 1; k++) {
-                    resultats[k] = resultats[k + 1];
-                    strncpy(noms_resultats[k], noms_resultats[k + 1], 63);
-                }
-                nombre_resultats--;
-                retour_action = 1;
-            }
-        }
-    }
-}
-
-/* ============================================================
- *  [7] LIBERER
- * ============================================================ */
-void menu_liberer() {
-    char* options[3] = {
-        "      Liberer une rose                ",
-        "      Liberer toutes les roses        ",
-        "      Retour                          "
-    };
-    int retour = 0;
-    while (!retour) {
-        effacer_ecran();
-        aller_xy(20, 3);
-        printf("\e[38;5;204m--- LIBERER LA MEMOIRE ---\e[0m");
-        int choix = selectionner_menu(options, 3, 18, 6);
-
-        if (choix == 2) { retour = 1; continue; }
-
-        if (choix == 0) {
-            if (nombre_roses == 0) {
-                effacer_ecran();
-                aller_xy(15, 8);
-                printf("Aucune rose chargee.");
-                lire_touche();
+        int action_back = 0;
+        while (action_back == 0) {
+            clear_screen();
+            go_xy(20, 3);
+            printf("\e[38;5;204m--- %s ---\e[0m", results_names[choice]);
+            int act = select_menu(actions, 3, 18, 6);
+            if (act == 2) {
+                action_back = 1;
                 continue;
             }
-            effacer_ecran();
-            aller_xy(20, 3);
-            printf("\e[38;5;204m--- CHOISIR UNE ROSE A LIBERER ---\e[0m");
-            char* liste[MAX_ROSES + 1];
-            char  tampons[MAX_ROSES + 1][70];
-            for (int i = 0; i < nombre_roses; i++) {
-                sprintf(tampons[i], "      %d. %-35s", i + 1, roses[i]->nom);
-                liste[i] = tampons[i];
+            if (act == 0) {
+                clear_screen();
+                go_xy(20, 3);
+                printf("\e[38;5;204m--- RESULT: %s ---\e[0m\n\n", results_names[choice]);
+                petal_print_by_alpha(results[choice]);
+                printf("\n  Press a key...");
+                read_key();
             }
-            sprintf(tampons[nombre_roses], "      Retour                                       ");
-            liste[nombre_roses] = tampons[nombre_roses];
-            int choix_rose = selectionner_menu(liste, nombre_roses + 1, 18, 6);
-            if (choix_rose == nombre_roses) continue;
-
-            rose_free(roses[choix_rose]);
-            for (int k = choix_rose; k < nombre_roses - 1; k++)
-                roses[k] = roses[k + 1];
-            nombre_roses--;
-            aller_xy(15, 20);
-            printf("\e[38;5;204mRose liberee avec succes.\e[0m");
-            lire_touche();
-
-        } else if (choix == 1) {
-            for (int i = 0; i < nombre_roses; i++) rose_free(roses[i]);
-            nombre_roses = 0;
-            aller_xy(15, 20);
-            printf("\e[38;5;204mToutes les roses ont ete liberees.\e[0m");
-            lire_touche();
+            else {
+                petal_free(results[choice]);
+                int k = choice;
+                while (k < results_count - 1) {
+                    results[k] = results[k + 1];
+                    strncpy(results_names[k], results_names[k + 1], 63);
+                    k = k + 1;
+                }
+                results_count = results_count - 1;
+                action_back = 1;
+            }
         }
     }
 }
 
-/* ============================================================
- *  A PROPOS
- * ============================================================ */
-void menu_a_propos() {
-    effacer_ecran();
-    aller_xy(28, 3);
-    printf("\e[38;5;204m--- A PROPOS DE ROSE-PETALE ---\e[0m");
-    afficher_separateur(5);
-    aller_xy(15, 7);
-    printf("Application  : Systeme d'analyse textuelle ROSE-PETALE");
-    aller_xy(15, 9);
-    printf("Description  : Structure duale basee sur deux arbres Rouge-Noir");
-    aller_xy(15, 10);
-    printf("               par paragraphe — Alpha-RBT (mots) et Pos-RBT (positions).");
-    aller_xy(15, 12);
-    printf("Structures   : Liste circulaire doublement chainee + ARN + Table de hachage");
-    aller_xy(15, 14);
-    printf("Operations   : Theorie des ensembles sur mots et phrases (O(n+m))");
-    afficher_separateur(16);
-    aller_xy(15, 18);
-    printf("ESI — Ecole Nationale Superieure d'Informatique");
-    aller_xy(15, 19);
-    printf("Module : Algorithmique et Structures de Donnees Dynamiques");
-    aller_xy(20, 22);
-    printf("Appuyez sur une touche pour retourner...");
-    lire_touche();
-}
-
-/* ============================================================
- *  MENU DEMARRER
- * ============================================================ */
-void menu_demarrer() {
-    char* options[8] = {
-        "      1. Charger un fichier           ",
-        "      2. Affichage                    ",
-        "      3. Recherche                    ",
-        "      4. Operations sur mots          ",
-        "      5. Operations sur phrases       ",
-        "      6. Resultats sauvegardes        ",
-        "      7. Liberer la memoire           ",
-        "      8. Retour                       "
+void menu_free()
+{
+    char* opts[3] = {
+        "      Free one rose                   ",
+        "      Free all roses                  ",
+        "      Back                            "
     };
-    int retour = 0;
-    while (!retour) {
-        effacer_ecran();
-        aller_xy(22, 3);
-        printf("\e[38;5;204m--- GESTION DES ROSES ---\e[0m");
-        aller_xy(15, 5);
-        printf("Roses chargees : %d/%d", nombre_roses, MAX_ROSES);
-        int choix = selectionner_menu(options, 8, 18, 7);
-        switch (choix) {
-            case 0: menu_charger_fichier();    break;
-            case 1: menu_affichage();          break;
-            case 2: menu_recherche();          break;
-            case 3: menu_operations_mots();    break;
-            case 4: menu_operations_phrases(); break;
-            case 5: menu_resultats();          break;
-            case 6: menu_liberer();            break;
-            case 7: retour = 1;                break;
+    int back = 0;
+    while (back == 0) {
+        clear_screen();
+        go_xy(20, 3);
+        printf("\e[38;5;204m--- FREE MEMORY ---\e[0m");
+        int choice = select_menu(opts, 3, 18, 6);
+
+        if (choice == 2) {
+            back = 1;
+            continue;
+        }
+
+        if (choice == 0) {
+            if (roses_count == 0) {
+                clear_screen();
+                go_xy(15, 8);
+                printf("No rose loaded.");
+                read_key();
+                continue;
+            }
+            clear_screen();
+            go_xy(20, 3);
+            printf("\e[38;5;204m--- PICK A ROSE TO FREE ---\e[0m");
+            char* list[MAX_ROSES + 1];
+            char buf[MAX_ROSES + 1][70];
+            int i = 0;
+            while (i < roses_count) {
+                sprintf(buf[i], "      %d. %-35s", i + 1, roses[i]->name);
+                list[i] = buf[i];
+                i = i + 1;
+            }
+            sprintf(buf[roses_count], "      Back                                       ");
+            list[roses_count] = buf[roses_count];
+            int rc = select_menu(list, roses_count + 1, 18, 6);
+            if (rc == roses_count) {
+                continue;
+            }
+
+            rose_free(roses[rc]);
+            int k = rc;
+            while (k < roses_count - 1) {
+                roses[k] = roses[k + 1];
+                k = k + 1;
+            }
+            roses_count = roses_count - 1;
+            go_xy(15, 20);
+            printf("\e[38;5;204mRose freed.\e[0m");
+            read_key();
+        }
+        else {
+            int i = 0;
+            while (i < roses_count) {
+                rose_free(roses[i]);
+                i = i + 1;
+            }
+            roses_count = 0;
+            go_xy(15, 20);
+            printf("\e[38;5;204mAll roses freed.\e[0m");
+            read_key();
         }
     }
 }
 
-/* ============================================================
- *  MENU PRINCIPAL
- * ============================================================ */
-void menu_principal() {
-    int quitter = 0;
-    while (!quitter) {
-        effacer_ecran();
-        afficher_logo();
-        aller_xy(18, 9);
-        printf("\e[38;5;204m--- BIENVENUE DANS ROSE-PETALE ---\e[0m");
-        char* options[3] = {
-            "         1. DEMARRER ROSE         ",
-            "         2. A PROPOS              ",
-            "         3. QUITTER               "
+void menu_about()
+{
+    clear_screen();
+    go_xy(28, 3);
+    printf("\e[38;5;204m--- ABOUT ROSE-PETAL ---\e[0m");
+    print_separator(5);
+    go_xy(15, 7);
+    printf("Application: ROSE-PETAL textual analyzer");
+    go_xy(15, 9);
+    printf("Description: Dual structure based on two Red-Black trees");
+    go_xy(15, 10);
+    printf("             per paragraph -- Alpha-RBT (words) and Pos-RBT (positions).");
+    go_xy(15, 12);
+    printf("Structures : Doubly linked circular list + RBT");
+    go_xy(15, 14);
+    printf("Operations : Word-level set theory (O(n+m))");
+    print_separator(16);
+    go_xy(15, 18);
+    printf("ESI -- Ecole Nationale Superieure d'Informatique");
+    go_xy(15, 19);
+    printf("Module: Algorithms and Dynamic Data Structures");
+    go_xy(20, 22);
+    printf("Press a key to go back...");
+    read_key();
+}
+
+void menu_start()
+{
+    char* opts[7] = {
+        "      1. Load a file                  ",
+        "      2. Display                      ",
+        "      3. Search                       ",
+        "      4. Word operations              ",
+        "      5. Saved results                ",
+        "      6. Free memory                  ",
+        "      7. Back                         "
+    };
+    int back = 0;
+    while (back == 0) {
+        clear_screen();
+        go_xy(22, 3);
+        printf("\e[38;5;204m--- ROSE MANAGER ---\e[0m");
+        go_xy(15, 5);
+        printf("Loaded roses: %d/%d", roses_count, MAX_ROSES);
+        int choice = select_menu(opts, 7, 18, 7);
+        if (choice == 0) {
+            menu_load_file();
+        }
+        else if (choice == 1) {
+            menu_display();
+        }
+        else if (choice == 2) {
+            menu_search();
+        }
+        else if (choice == 3) {
+            menu_word_operations();
+        }
+        else if (choice == 4) {
+            menu_results();
+        }
+        else if (choice == 5) {
+            menu_free();
+        }
+        else {
+            back = 1;
+        }
+    }
+}
+
+void main_menu()
+{
+    int quit = 0;
+    while (quit == 0) {
+        clear_screen();
+        print_logo();
+        go_xy(18, 9);
+        printf("\e[38;5;204m--- WELCOME TO ROSE-PETAL ---\e[0m");
+        char* opts[3] = {
+            "         1. START ROSE            ",
+            "         2. ABOUT                 ",
+            "         3. QUIT                  "
         };
-        int choix = selectionner_menu(options, 3, 23, 12);
-        switch (choix) {
-            case 0: menu_demarrer(); break;
-            case 1: menu_a_propos(); break;
-            case 2:
-                effacer_ecran();
-                aller_xy(25, 10);
-                printf("\e[38;5;204mAu revoir !\e[0m\n\n");
-                /* liberer toute la memoire avant de quitter */
-                for (int i = 0; i < nombre_roses;    i++) rose_free(roses[i]);
-                for (int i = 0; i < nombre_resultats; i++) petal_free(resultats[i]);
-                quitter = 1;
-                break;
+        int choice = select_menu(opts, 3, 23, 12);
+        if (choice == 0) {
+            menu_start();
+        }
+        else if (choice == 1) {
+            menu_about();
+        }
+        else {
+            clear_screen();
+            go_xy(25, 10);
+            printf("\e[38;5;204mGoodbye!\e[0m\n\n");
+            int i = 0;
+            while (i < roses_count) {
+                rose_free(roses[i]);
+                i = i + 1;
+            }
+            int j = 0;
+            while (j < results_count) {
+                petal_free(results[j]);
+                j = j + 1;
+            }
+            quit = 1;
         }
     }
 }
 
-/* ============================================================
- *  POINT D'ENTREE
- * ============================================================ */
-int main() {
-    menu_principal();
+int main()
+{
+    main_menu();
     return 0;
 }

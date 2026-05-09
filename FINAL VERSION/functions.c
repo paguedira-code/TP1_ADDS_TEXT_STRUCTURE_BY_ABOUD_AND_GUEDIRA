@@ -1,1014 +1,1077 @@
 #include "structures.h"
 
-/* ============================================================
- *  SENTINELS GLOBAUX
- * ============================================================ */
 AlphaRBTNode ALPHA_NIL = { NULL, NULL, BLACK, 0, &ALPHA_NIL, &ALPHA_NIL, &ALPHA_NIL };
-PosRBTNode   POS_NIL   = { 0, NULL, BLACK, &POS_NIL, &POS_NIL, &POS_NIL, 0 };
+PosRBTNode POS_NIL = { 0, NULL, BLACK, &POS_NIL, &POS_NIL, &POS_NIL };
 
-/* ============================================================
- *  LAYER 0 — Liste de positions
- * ============================================================ */
-PosNode* poslist_create_node(PosRBTNode* ref) {
-    PosNode* nouveau = malloc(sizeof(PosNode));
-    if (!nouveau) { printf("erreur malloc PosNode\n"); return NULL; }
-    nouveau->pos_ref = ref;
-    nouveau->next    = nouveau;
-    nouveau->prev    = nouveau;
-    return nouveau;
+PosNode* poslist_create_node(PosRBTNode* ref)
+{
+    PosNode* node = malloc(sizeof(PosNode));
+    if (node == NULL) {
+        printf("malloc failed PosNode\n");
+        return NULL;
+    }
+    node->pos_ref = ref;
+    node->next = node;
+    node->prev = node;
+    return node;
 }
 
-void poslist_insert(PosNode** head, PosRBTNode* ref) {
-    PosNode* nouveau = poslist_create_node(ref);
+void poslist_insert(PosNode** head, PosRBTNode* ref)
+{
+    PosNode* node = poslist_create_node(ref);
     if (*head == NULL) {
-        *head = nouveau;
+        *head = node;
         return;
     }
-    PosNode* dernier  = (*head)->prev;
-    dernier->next     = nouveau;
-    nouveau->prev     = dernier;
-    nouveau->next     = *head;
-    (*head)->prev     = nouveau;
+    PosNode* last = (*head)->prev;
+    last->next = node;
+    node->prev = last;
+    node->next = *head;
+    (*head)->prev = node;
 }
 
-void poslist_free(PosNode* head) {
-    if (!head) return;
-    PosNode* courant = head;
+void poslist_free(PosNode* head)
+{
+    if (head == NULL) {
+        return;
+    }
+    PosNode* cur = head;
     do {
-        PosNode* temporaire = courant;
-        courant = courant->next;
-        free(temporaire);
-    } while (courant != head);
+        PosNode* tmp = cur;
+        cur = cur->next;
+        free(tmp);
+    } while (cur != head);
 }
 
-void poslist_print(PosNode* head) {
-    if (!head) { printf("[]"); return; }
+void poslist_print(PosNode* head)
+{
+    if (head == NULL) {
+        printf("[]");
+        return;
+    }
     printf("[");
-    PosNode* courant = head;
+    PosNode* cur = head;
     do {
-        printf("%d", courant->pos_ref->position);
-        if (courant->next != head) printf(" <-> ");
-        courant = courant->next;
-    } while (courant != head);
+        printf("%d", cur->pos_ref->position);
+        if (cur->next != head) {
+            printf(" <-> ");
+        }
+        cur = cur->next;
+    } while (cur != head);
     printf("]");
 }
 
-/* ============================================================
- *  LAYER 1 — Allocation des arbres
- * ============================================================ */
-AlphaRBT* AlocateAlphaRBT() {
-    AlphaRBT* arbre = malloc(sizeof(AlphaRBT));
-    arbre->root = &ALPHA_NIL;
-    return arbre;
+AlphaRBT* allocate_alpha_rbt()
+{
+    AlphaRBT* tree = malloc(sizeof(AlphaRBT));
+    tree->root = &ALPHA_NIL;
+    return tree;
 }
 
-PosRBT* AlocatePosRBT() {
-    PosRBT* arbre = malloc(sizeof(PosRBT));
-    arbre->root   = &POS_NIL;
-    arbre->max    = &POS_NIL;
-    return arbre;
+PosRBT* allocate_pos_rbt()
+{
+    PosRBT* tree = malloc(sizeof(PosRBT));
+    tree->root = &POS_NIL;
+    tree->max = &POS_NIL;
+    return tree;
 }
 
-AlphaRBTNode* allocateAlphaRBTNode() {
-    AlphaRBTNode* noeud = malloc(sizeof(AlphaRBTNode));
-    if (!noeud) { printf("malloc raté AlphaRBTNode\n"); return &ALPHA_NIL; }
-    noeud->color    = RED;
-    noeud->parent   = &ALPHA_NIL;
-    noeud->left     = &ALPHA_NIL;
-    noeud->right    = &ALPHA_NIL;
-    noeud->pos_list = NULL;
-    noeud->rep      = 0;
-    noeud->word     = NULL;
-    return noeud;
+AlphaRBTNode* allocate_alpha_node()
+{
+    AlphaRBTNode* node = malloc(sizeof(AlphaRBTNode));
+    if (node == NULL) {
+        printf("malloc failed AlphaRBTNode\n");
+        return &ALPHA_NIL;
+    }
+    node->color = RED;
+    node->parent = &ALPHA_NIL;
+    node->left = &ALPHA_NIL;
+    node->right = &ALPHA_NIL;
+    node->pos_list = NULL;
+    node->rep = 0;
+    node->word = NULL;
+    return node;
 }
 
-PosRBTNode* allocatePosRBTNode() {
-    PosRBTNode* noeud = malloc(sizeof(PosRBTNode));
-    if (!noeud) { printf("malloc raté PosRBTNode\n"); return &POS_NIL; }
-    noeud->color     = RED;
-    noeud->parent    = &POS_NIL;
-    noeud->left      = &POS_NIL;
-    noeud->right     = &POS_NIL;
-    noeud->word_ref  = NULL;
-    noeud->position  = 0;
-    noeud->sent_flag = 0;
-    return noeud;
+PosRBTNode* allocate_pos_node()
+{
+    PosRBTNode* node = malloc(sizeof(PosRBTNode));
+    if (node == NULL) {
+        printf("malloc failed PosRBTNode\n");
+        return &POS_NIL;
+    }
+    node->color = RED;
+    node->parent = &POS_NIL;
+    node->left = &POS_NIL;
+    node->right = &POS_NIL;
+    node->word_ref = NULL;
+    node->position = 0;
+    return node;
 }
 
-/* ============================================================
- *  LAYER 1 — Rotations
- * ============================================================ */
-void AlphaRBTRightRot(AlphaRBT* arbre, AlphaRBTNode* y) {
+void alpha_right_rotate(AlphaRBT* tree, AlphaRBTNode* y)
+{
     AlphaRBTNode* x = y->left;
     y->left = x->right;
-    if (x->right != &ALPHA_NIL) x->right->parent = y;
+    if (x->right != &ALPHA_NIL) {
+        x->right->parent = y;
+    }
     x->parent = y->parent;
-    if (y->parent == &ALPHA_NIL)       arbre->root      = x;
-    else if (y == y->parent->left)     y->parent->left  = x;
-    else                               y->parent->right = x;
-    x->right  = y;
+    if (y->parent == &ALPHA_NIL) {
+        tree->root = x;
+    }
+    else if (y == y->parent->left) {
+        y->parent->left = x;
+    }
+    else {
+        y->parent->right = x;
+    }
+    x->right = y;
     y->parent = x;
 }
 
-void AlphaRBTLeftRot(AlphaRBT* arbre, AlphaRBTNode* y) {
+void alpha_left_rotate(AlphaRBT* tree, AlphaRBTNode* y)
+{
     AlphaRBTNode* x = y->right;
     y->right = x->left;
-    if (x->left != &ALPHA_NIL) x->left->parent = y;
+    if (x->left != &ALPHA_NIL) {
+        x->left->parent = y;
+    }
     x->parent = y->parent;
-    if (y->parent == &ALPHA_NIL)       arbre->root      = x;
-    else if (y == y->parent->right)    y->parent->right = x;
-    else                               y->parent->left  = x;
-    x->left   = y;
+    if (y->parent == &ALPHA_NIL) {
+        tree->root = x;
+    }
+    else if (y == y->parent->right) {
+        y->parent->right = x;
+    }
+    else {
+        y->parent->left = x;
+    }
+    x->left = y;
     y->parent = x;
 }
 
-void PosRBTRightRot(PosRBT* arbre, PosRBTNode* y) {
+void pos_right_rotate(PosRBT* tree, PosRBTNode* y)
+{
     PosRBTNode* x = y->left;
     y->left = x->right;
-    if (x->right != &POS_NIL) x->right->parent = y;
+    if (x->right != &POS_NIL) {
+        x->right->parent = y;
+    }
     x->parent = y->parent;
-    if (y->parent == &POS_NIL)         arbre->root      = x;
-    else if (y == y->parent->left)     y->parent->left  = x;
-    else                               y->parent->right = x;
-    x->right  = y;
+    if (y->parent == &POS_NIL) {
+        tree->root = x;
+    }
+    else if (y == y->parent->left) {
+        y->parent->left = x;
+    }
+    else {
+        y->parent->right = x;
+    }
+    x->right = y;
     y->parent = x;
 }
 
-void PosRBTLeftRot(PosRBT* arbre, PosRBTNode* y) {
+void pos_left_rotate(PosRBT* tree, PosRBTNode* y)
+{
     PosRBTNode* x = y->right;
     y->right = x->left;
-    if (x->left != &POS_NIL) x->left->parent = y;
+    if (x->left != &POS_NIL) {
+        x->left->parent = y;
+    }
     x->parent = y->parent;
-    if (y->parent == &POS_NIL)         arbre->root      = x;
-    else if (y == y->parent->right)    y->parent->right = x;
-    else                               y->parent->left  = x;
-    x->left   = y;
+    if (y->parent == &POS_NIL) {
+        tree->root = x;
+    }
+    else if (y == y->parent->right) {
+        y->parent->right = x;
+    }
+    else {
+        y->parent->left = x;
+    }
+    x->left = y;
     y->parent = x;
 }
 
-/* ============================================================
- *  LAYER 1 — Fixup après insertion
- * ============================================================ */
-void AlphaRBTfix(AlphaRBT* arbre, AlphaRBTNode* noeud) {
-    AlphaRBTNode* oncle;
-    AlphaRBTNode* grandparent;
-    while (noeud->parent != &ALPHA_NIL && noeud->parent->color == RED) {
-        grandparent = noeud->parent->parent;
-        if (noeud->parent == grandparent->left) {
-            oncle = grandparent->right;
-            if (oncle->color == RED) {
-                oncle->color             = BLACK;
-                noeud->parent->color     = BLACK;
-                grandparent->color       = RED;
-                noeud                    = grandparent;
-            } else {
-                if (noeud == noeud->parent->right) {
-                    noeud = noeud->parent;
-                    AlphaRBTLeftRot(arbre, noeud);
-                }
-                noeud->parent->color = BLACK;
-                grandparent->color   = RED;
-                AlphaRBTRightRot(arbre, grandparent);
+void alpha_fixup(AlphaRBT* tree, AlphaRBTNode* node)
+{
+    AlphaRBTNode* uncle;
+    AlphaRBTNode* gp;
+    while (node->parent != &ALPHA_NIL && node->parent->color == RED) {
+        gp = node->parent->parent;
+        if (node->parent == gp->left) {
+            uncle = gp->right;
+            if (uncle->color == RED) {
+                uncle->color = BLACK;
+                node->parent->color = BLACK;
+                gp->color = RED;
+                node = gp;
             }
-        } else {
-            oncle = grandparent->left;
-            if (oncle->color == RED) {
-                oncle->color             = BLACK;
-                noeud->parent->color     = BLACK;
-                grandparent->color       = RED;
-                noeud                    = grandparent;
-            } else {
-                if (noeud == noeud->parent->left) {
-                    noeud = noeud->parent;
-                    AlphaRBTRightRot(arbre, noeud);
+            else {
+                if (node == node->parent->right) {
+                    node = node->parent;
+                    alpha_left_rotate(tree, node);
                 }
-                noeud->parent->color = BLACK;
-                grandparent->color   = RED;
-                AlphaRBTLeftRot(arbre, grandparent);
+                node->parent->color = BLACK;
+                gp->color = RED;
+                alpha_right_rotate(tree, gp);
+            }
+        }
+        else {
+            uncle = gp->left;
+            if (uncle->color == RED) {
+                uncle->color = BLACK;
+                node->parent->color = BLACK;
+                gp->color = RED;
+                node = gp;
+            }
+            else {
+                if (node == node->parent->left) {
+                    node = node->parent;
+                    alpha_right_rotate(tree, node);
+                }
+                node->parent->color = BLACK;
+                gp->color = RED;
+                alpha_left_rotate(tree, gp);
             }
         }
     }
-    arbre->root->color = BLACK;
+    tree->root->color = BLACK;
 }
 
-void PosRBTfix(PosRBT* arbre, PosRBTNode* noeud) {
-    PosRBTNode* oncle;
-    PosRBTNode* grandparent;
-    while (noeud->parent != &POS_NIL && noeud->parent->color == RED) {
-        grandparent = noeud->parent->parent;
-        if (noeud->parent == grandparent->left) {
-            oncle = grandparent->right;
-            if (oncle->color == RED) {
-                oncle->color             = BLACK;
-                noeud->parent->color     = BLACK;
-                grandparent->color       = RED;
-                noeud                    = grandparent;
-            } else {
-                if (noeud == noeud->parent->right) {
-                    noeud = noeud->parent;
-                    PosRBTLeftRot(arbre, noeud);
-                }
-                noeud->parent->color = BLACK;
-                grandparent->color   = RED;
-                PosRBTRightRot(arbre, grandparent);
+void pos_fixup(PosRBT* tree, PosRBTNode* node)
+{
+    PosRBTNode* uncle;
+    PosRBTNode* gp;
+    while (node->parent != &POS_NIL && node->parent->color == RED) {
+        gp = node->parent->parent;
+        if (node->parent == gp->left) {
+            uncle = gp->right;
+            if (uncle->color == RED) {
+                uncle->color = BLACK;
+                node->parent->color = BLACK;
+                gp->color = RED;
+                node = gp;
             }
-        } else {
-            oncle = grandparent->left;
-            if (oncle->color == RED) {
-                oncle->color             = BLACK;
-                noeud->parent->color     = BLACK;
-                grandparent->color       = RED;
-                noeud                    = grandparent;
-            } else {
-                if (noeud == noeud->parent->left) {
-                    noeud = noeud->parent;
-                    PosRBTRightRot(arbre, noeud);
+            else {
+                if (node == node->parent->right) {
+                    node = node->parent;
+                    pos_left_rotate(tree, node);
                 }
-                noeud->parent->color = BLACK;
-                grandparent->color   = RED;
-                PosRBTLeftRot(arbre, grandparent);
+                node->parent->color = BLACK;
+                gp->color = RED;
+                pos_right_rotate(tree, gp);
+            }
+        }
+        else {
+            uncle = gp->left;
+            if (uncle->color == RED) {
+                uncle->color = BLACK;
+                node->parent->color = BLACK;
+                gp->color = RED;
+                node = gp;
+            }
+            else {
+                if (node == node->parent->left) {
+                    node = node->parent;
+                    pos_right_rotate(tree, node);
+                }
+                node->parent->color = BLACK;
+                gp->color = RED;
+                pos_left_rotate(tree, gp);
             }
         }
     }
-    arbre->root->color = BLACK;
+    tree->root->color = BLACK;
 }
 
-/* ============================================================
- *  LAYER 1 — Insertion
- * ============================================================ */
-AlphaRBTNode* Insert_AlphaRBT(AlphaRBT* arbre, char* mot) {
+AlphaRBTNode* insert_alpha(AlphaRBT* tree, char* word)
+{
     AlphaRBTNode* parent = &ALPHA_NIL;
-    AlphaRBTNode* noeud  = arbre->root;
-    while (noeud != &ALPHA_NIL) {
-        int comparaison = strcmp(mot, noeud->word);
-        if (comparaison == 0) return noeud;
-        parent = noeud;
-        noeud  = (comparaison < 0) ? noeud->left : noeud->right;
+    AlphaRBTNode* node = tree->root;
+    while (node != &ALPHA_NIL) {
+        int cmp = strcmp(word, node->word);
+        if (cmp == 0) {
+            return node;
+        }
+        parent = node;
+        if (cmp < 0) {
+            node = node->left;
+        }
+        else {
+            node = node->right;
+        }
     }
-    AlphaRBTNode* nouveau = allocateAlphaRBTNode();
-    nouveau->word         = strdup(mot);
-    nouveau->parent       = parent;
-    if (parent == &ALPHA_NIL)
-        arbre->root = nouveau;
-    else if (strcmp(mot, parent->word) < 0)
-        parent->left  = nouveau;
-    else
-        parent->right = nouveau;
-    AlphaRBTfix(arbre, nouveau);
-    return nouveau;
+    AlphaRBTNode* new_node = allocate_alpha_node();
+    new_node->word = strdup(word);
+    new_node->parent = parent;
+    if (parent == &ALPHA_NIL) {
+        tree->root = new_node;
+    }
+    else if (strcmp(word, parent->word) < 0) {
+        parent->left = new_node;
+    }
+    else {
+        parent->right = new_node;
+    }
+    alpha_fixup(tree, new_node);
+    return new_node;
 }
 
-PosRBTNode* Insert_PosRBT(PosRBT* arbre) {
-    PosRBTNode* nouveau = allocatePosRBTNode();
-    nouveau->parent     = arbre->max;
-    if (arbre->max == &POS_NIL) {
-        nouveau->position = 1;
-        arbre->root       = nouveau;
-    } else {
-        nouveau->position    = arbre->max->position + 1;
-        arbre->max->right    = nouveau;
+PosRBTNode* insert_pos(PosRBT* tree)
+{
+    PosRBTNode* new_node = allocate_pos_node();
+    new_node->parent = tree->max;
+    if (tree->max == &POS_NIL) {
+        new_node->position = 1;
+        tree->root = new_node;
     }
-    PosRBTfix(arbre, nouveau);
-    arbre->max = nouveau;
-    return nouveau;
+    else {
+        new_node->position = tree->max->position + 1;
+        tree->max->right = new_node;
+    }
+    pos_fixup(tree, new_node);
+    tree->max = new_node;
+    return new_node;
 }
 
-/* ============================================================
- *  LAYER 1 — Parcours infixe
- * ============================================================ */
-AlphaRBTNode* alpha_inorder_first(AlphaRBT* arbre) {
-    AlphaRBTNode* noeud = arbre->root;
-    if (noeud == &ALPHA_NIL) return &ALPHA_NIL;
-    while (noeud->left != &ALPHA_NIL) noeud = noeud->left;
-    return noeud;
+AlphaRBTNode* alpha_inorder_first(AlphaRBT* tree)
+{
+    AlphaRBTNode* node = tree->root;
+    if (node == &ALPHA_NIL) {
+        return &ALPHA_NIL;
+    }
+    while (node->left != &ALPHA_NIL) {
+        node = node->left;
+    }
+    return node;
 }
 
-AlphaRBTNode* alpha_inorder_next(AlphaRBTNode* noeud) {
-    if (noeud->right != &ALPHA_NIL) {
-        noeud = noeud->right;
-        while (noeud->left != &ALPHA_NIL) noeud = noeud->left;
-        return noeud;
+AlphaRBTNode* alpha_inorder_next(AlphaRBTNode* node)
+{
+    if (node->right != &ALPHA_NIL) {
+        node = node->right;
+        while (node->left != &ALPHA_NIL) {
+            node = node->left;
+        }
+        return node;
     }
-    AlphaRBTNode* parent = noeud->parent;
-    while (parent != &ALPHA_NIL && noeud == parent->right) {
-        noeud  = parent;
+    AlphaRBTNode* parent = node->parent;
+    while (parent != &ALPHA_NIL && node == parent->right) {
+        node = parent;
         parent = parent->parent;
     }
     return parent;
 }
 
-PosRBTNode* pos_inorder_first(PosRBT* arbre) {
-    PosRBTNode* noeud = arbre->root;
-    if (noeud == &POS_NIL) return &POS_NIL;
-    while (noeud->left != &POS_NIL) noeud = noeud->left;
-    return noeud;
+PosRBTNode* pos_inorder_first(PosRBT* tree)
+{
+    PosRBTNode* node = tree->root;
+    if (node == &POS_NIL) {
+        return &POS_NIL;
+    }
+    while (node->left != &POS_NIL) {
+        node = node->left;
+    }
+    return node;
 }
 
-PosRBTNode* pos_inorder_next(PosRBTNode* noeud) {
-    if (noeud->right != &POS_NIL) {
-        noeud = noeud->right;
-        while (noeud->left != &POS_NIL) noeud = noeud->left;
-        return noeud;
+PosRBTNode* pos_inorder_next(PosRBTNode* node)
+{
+    if (node->right != &POS_NIL) {
+        node = node->right;
+        while (node->left != &POS_NIL) {
+            node = node->left;
+        }
+        return node;
     }
-    PosRBTNode* parent = noeud->parent;
-    while (parent != &POS_NIL && noeud == parent->right) {
-        noeud  = parent;
+    PosRBTNode* parent = node->parent;
+    while (parent != &POS_NIL && node == parent->right) {
+        node = parent;
         parent = parent->parent;
     }
     return parent;
 }
 
-/* ============================================================
- *  LAYER 1 — Liberation memoire
- * ============================================================ */
-void pos_rbt_free(PosRBTNode* noeud) {
-    if (noeud == &POS_NIL) return;
-    pos_rbt_free(noeud->left);
-    pos_rbt_free(noeud->right);
-    free(noeud);
+void pos_rbt_free(PosRBTNode* node)
+{
+    if (node == &POS_NIL) {
+        return;
+    }
+    pos_rbt_free(node->left);
+    pos_rbt_free(node->right);
+    free(node);
 }
 
-void alpha_rbt_free(AlphaRBTNode* noeud) {
-    if (noeud == &ALPHA_NIL) return;
-    alpha_rbt_free(noeud->left);
-    alpha_rbt_free(noeud->right);
-    poslist_free(noeud->pos_list);
-    free(noeud->word);
-    free(noeud);
+void alpha_rbt_free(AlphaRBTNode* node)
+{
+    if (node == &ALPHA_NIL) {
+        return;
+    }
+    alpha_rbt_free(node->left);
+    alpha_rbt_free(node->right);
+    poslist_free(node->pos_list);
+    free(node->word);
+    free(node);
 }
 
-/* ============================================================
- *  LAYER 1 — Affichage
- * ============================================================ */
-void Print_PosRBT(PosRBT* arbre, PosRBTNode* noeud) {
-    if (noeud == &POS_NIL) return;
-    Print_PosRBT(arbre, noeud->left);
-    printf("%s ", noeud->word_ref->word);
-    Print_PosRBT(arbre, noeud->right);
+void print_pos_tree(PosRBT* tree, PosRBTNode* node)
+{
+    if (node == &POS_NIL) {
+        return;
+    }
+    print_pos_tree(tree, node->left);
+    printf("%s ", node->word_ref->word);
+    print_pos_tree(tree, node->right);
 }
 
-void Print_AlphaRBT(AlphaRBTNode* noeud) {
-    if (noeud == &ALPHA_NIL) return;
-    Print_AlphaRBT(noeud->left);
-    printf("  - %s (x%d | positions: ", noeud->word, noeud->rep);
-    poslist_print(noeud->pos_list);
+void print_alpha_tree(AlphaRBTNode* node)
+{
+    if (node == &ALPHA_NIL) {
+        return;
+    }
+    print_alpha_tree(node->left);
+    printf("  - %s (x%d | positions: ", node->word, node->rep);
+    poslist_print(node->pos_list);
     printf(")\n");
-    Print_AlphaRBT(noeud->right);
+    print_alpha_tree(node->right);
 }
 
-/* ============================================================
- *  LAYER 2 — Petal
- * ============================================================ */
-PetalNode* allocatePetalNode() {
-    PetalNode* petale = malloc(sizeof(PetalNode));
-    if (!petale) { printf("malloc raté petal\n"); return NULL; }
-    petale->alpha_tree = AlocateAlphaRBT();
-    petale->pos_tree   = AlocatePosRBT();
-    petale->next       = petale;
-    petale->prev       = petale;
-    return petale;
+PetalNode* allocate_petal()
+{
+    PetalNode* p = malloc(sizeof(PetalNode));
+    if (p == NULL) {
+        printf("malloc failed petal\n");
+        return NULL;
+    }
+    p->alpha_tree = allocate_alpha_rbt();
+    p->pos_tree = allocate_pos_rbt();
+    p->next = p;
+    p->prev = p;
+    return p;
 }
 
-void petal_free(PetalNode* petale) {
-    if (!petale) return;
-    pos_rbt_free(petale->pos_tree->root);
-    free(petale->pos_tree);
-    alpha_rbt_free(petale->alpha_tree->root);
-    free(petale->alpha_tree);
-    free(petale);
+void petal_free(PetalNode* p)
+{
+    if (p == NULL) {
+        return;
+    }
+    pos_rbt_free(p->pos_tree->root);
+    free(p->pos_tree);
+    alpha_rbt_free(p->alpha_tree->root);
+    free(p->alpha_tree);
+    free(p);
 }
 
-void Insert_word(PetalNode* petale, char* mot, int drapeau_phrase) {
-    AlphaRBTNode* noeud_alpha = Insert_AlphaRBT(petale->alpha_tree, mot);
-    PosRBTNode*   noeud_pos   = Insert_PosRBT(petale->pos_tree);
-    noeud_pos->sent_flag      = drapeau_phrase;
-    noeud_alpha->rep++;
-    noeud_pos->word_ref       = noeud_alpha;
-    poslist_insert(&noeud_alpha->pos_list, noeud_pos);
+void insert_word(PetalNode* p, char* word)
+{
+    AlphaRBTNode* a = insert_alpha(p->alpha_tree, word);
+    PosRBTNode* pn = insert_pos(p->pos_tree);
+    a->rep = a->rep + 1;
+    pn->word_ref = a;
+    poslist_insert(&a->pos_list, pn);
 }
 
-void petal_print_by_position(PetalNode* petale) {
-    if (!petale) return;
-    Print_PosRBT(petale->pos_tree, petale->pos_tree->root);
+void petal_print_by_position(PetalNode* p)
+{
+    if (p == NULL) {
+        return;
+    }
+    print_pos_tree(p->pos_tree, p->pos_tree->root);
     printf("\n");
 }
 
-void petal_print_by_alpha(PetalNode* petale) {
-    if (!petale) return;
-    Print_AlphaRBT(petale->alpha_tree->root);
+void petal_print_by_alpha(PetalNode* p)
+{
+    if (p == NULL) {
+        return;
+    }
+    print_alpha_tree(p->alpha_tree->root);
 }
 
-char* petal_word_at_pos(PetalNode* petale, int position) {
-    if (petale->pos_tree->root == &POS_NIL) return NULL;
-    PosRBTNode* courant = petale->pos_tree->root;
-    while (courant != &POS_NIL) {
-        if      (position == courant->position) return courant->word_ref->word;
-        else if (position  < courant->position) courant = courant->left;
-        else                                    courant = courant->right;
+char* petal_word_at_pos(PetalNode* p, int position)
+{
+    if (p->pos_tree->root == &POS_NIL) {
+        return NULL;
+    }
+    PosRBTNode* cur = p->pos_tree->root;
+    while (cur != &POS_NIL) {
+        if (position == cur->position) {
+            return cur->word_ref->word;
+        }
+        if (position < cur->position) {
+            cur = cur->left;
+        }
+        else {
+            cur = cur->right;
+        }
     }
     return NULL;
 }
 
-int petal_word_count(PetalNode* petale) {
-    if (petale->pos_tree->max == &POS_NIL) return 0;
-    return petale->pos_tree->max->position;
-}
-
-int petal_sentence_count(PetalNode* petale) {
-    if (petale->pos_tree->root == &POS_NIL) return 0;
-    int         nombre  = 0;
-    PosRBTNode* courant = pos_inorder_first(petale->pos_tree);
-    while (courant != &POS_NIL) {
-        if (courant->sent_flag) nombre++;
-        courant = pos_inorder_next(courant);
+int petal_word_count(PetalNode* p)
+{
+    if (p->pos_tree->max == &POS_NIL) {
+        return 0;
     }
-    return nombre;
+    return p->pos_tree->max->position;
 }
 
-int petal_get_sentence_start(PetalNode* petale, int n) {
-    if (petale->pos_tree->root == &POS_NIL) return -1;
-    int         nombre  = 0;
-    PosRBTNode* courant = pos_inorder_first(petale->pos_tree);
-    while (courant != &POS_NIL) {
-        if (courant->sent_flag) {
-            nombre++;
-            if (nombre == n) return courant->position;
-        }
-        courant = pos_inorder_next(courant);
+void petal_print_range(PetalNode* p, int start, int end)
+{
+    if (p->pos_tree->root == &POS_NIL) {
+        printf("  Empty petal.\n");
+        return;
     }
-    return -1;
-}
-
-void petal_print_sentences(PetalNode* petale) {
-    if (petale->pos_tree->root == &POS_NIL) { printf("  Petale vide.\n"); return; }
-    int         numero  = 0;
-    PosRBTNode* courant = pos_inorder_first(petale->pos_tree);
-    while (courant != &POS_NIL) {
-        if (courant->sent_flag) {
-            if (numero > 0) printf("\n");
-            numero++;
-            printf("  [Phrase %d] ", numero);
+    int total = petal_word_count(p);
+    if (start < 1 || end < start || start > total) {
+        printf("  Invalid range.\n");
+        return;
+    }
+    PosRBTNode* cur = p->pos_tree->root;
+    while (cur != &POS_NIL && cur->position != start) {
+        if (start < cur->position) {
+            cur = cur->left;
         }
-        printf("%s ", courant->word_ref->word);
-        courant = pos_inorder_next(courant);
+        else {
+            cur = cur->right;
+        }
+    }
+    printf("  [%d..%d] ", start, end);
+    while (cur != &POS_NIL && cur->position <= end) {
+        printf("%s ", cur->word_ref->word);
+        cur = pos_inorder_next(cur);
     }
     printf("\n");
 }
 
-void petal_print_range(PetalNode* petale, int debut, int fin) {
-    if (petale->pos_tree->root == &POS_NIL) { printf("  Petale vide.\n"); return; }
-    if (debut < 1 || fin < debut || debut > petal_word_count(petale)) {
-        printf("  Intervalle invalide.\n"); return;
+int petal_unique_word_count(PetalNode* p)
+{
+    if (p->alpha_tree->root == &ALPHA_NIL) {
+        return 0;
     }
-    PosRBTNode* courant = petale->pos_tree->root;
-    while (courant != &POS_NIL && courant->position != debut)
-        courant = (debut < courant->position) ? courant->left : courant->right;
-    printf("  [%d..%d] ", debut, fin);
-    while (courant != &POS_NIL && courant->position <= fin) {
-        printf("%s ", courant->word_ref->word);
-        courant = pos_inorder_next(courant);
+    int n = 0;
+    AlphaRBTNode* cur = alpha_inorder_first(p->alpha_tree);
+    while (cur != &ALPHA_NIL) {
+        n = n + 1;
+        cur = alpha_inorder_next(cur);
     }
-    printf("\n");
+    return n;
 }
 
-int petal_unique_word_count(PetalNode* petale) {
-    if (petale->alpha_tree->root == &ALPHA_NIL) return 0;
-    int           nombre  = 0;
-    AlphaRBTNode* courant = alpha_inorder_first(petale->alpha_tree);
-    while (courant != &ALPHA_NIL) { nombre++; courant = alpha_inorder_next(courant); }
-    return nombre;
-}
-
-char* petal_most_frequent_word(PetalNode* petale) {
-    if (petale->alpha_tree->root == &ALPHA_NIL) return NULL;
-    AlphaRBTNode* courant = alpha_inorder_first(petale->alpha_tree);
-    AlphaRBTNode* meilleur = courant;
-    while (courant != &ALPHA_NIL) {
-        if (courant->rep > meilleur->rep) meilleur = courant;
-        courant = alpha_inorder_next(courant);
+char* petal_most_frequent_word(PetalNode* p)
+{
+    if (p->alpha_tree->root == &ALPHA_NIL) {
+        return NULL;
     }
-    return meilleur->word;
-}
-
-char* petal_least_frequent_word(PetalNode* petale) {
-    if (petale->alpha_tree->root == &ALPHA_NIL) return NULL;
-    AlphaRBTNode* courant  = alpha_inorder_first(petale->alpha_tree);
-    AlphaRBTNode* meilleur = courant;
-    while (courant != &ALPHA_NIL) {
-        if (courant->rep < meilleur->rep) meilleur = courant;
-        courant = alpha_inorder_next(courant);
+    AlphaRBTNode* cur = alpha_inorder_first(p->alpha_tree);
+    AlphaRBTNode* best = cur;
+    while (cur != &ALPHA_NIL) {
+        if (cur->rep > best->rep) {
+            best = cur;
+        }
+        cur = alpha_inorder_next(cur);
     }
-    return meilleur->word;
+    return best->word;
 }
 
-void petal_print_frequency_table(PetalNode* petale) {
-    if (petale->alpha_tree->root == &ALPHA_NIL) { printf("  Petale vide.\n"); return; }
+char* petal_least_frequent_word(PetalNode* p)
+{
+    if (p->alpha_tree->root == &ALPHA_NIL) {
+        return NULL;
+    }
+    AlphaRBTNode* cur = alpha_inorder_first(p->alpha_tree);
+    AlphaRBTNode* best = cur;
+    while (cur != &ALPHA_NIL) {
+        if (cur->rep < best->rep) {
+            best = cur;
+        }
+        cur = alpha_inorder_next(cur);
+    }
+    return best->word;
+}
+
+void petal_print_frequency_table(PetalNode* p)
+{
+    if (p->alpha_tree->root == &ALPHA_NIL) {
+        printf("  Empty petal.\n");
+        return;
+    }
     int total = 0;
-    AlphaRBTNode* courant = alpha_inorder_first(petale->alpha_tree);
-    while (courant != &ALPHA_NIL) { total += courant->rep; courant = alpha_inorder_next(courant); }
-    printf("  %-20s %6s %8s\n", "Mot", "Nb", "Freq%%");
-    printf("  %-20s %6s %8s\n", "---", "--", "-----");
-    courant = alpha_inorder_first(petale->alpha_tree);
-    while (courant != &ALPHA_NIL) {
-        double frequence = total > 0 ? (100.0 * courant->rep / total) : 0.0;
-        printf("  %-20s %6d %7.2f%%\n", courant->word, courant->rep, frequence);
-        courant = alpha_inorder_next(courant);
+    AlphaRBTNode* cur = alpha_inorder_first(p->alpha_tree);
+    while (cur != &ALPHA_NIL) {
+        total = total + cur->rep;
+        cur = alpha_inorder_next(cur);
+    }
+    printf("  %-20s %6s %8s\n", "Word", "Count", "Freq%%");
+    printf("  %-20s %6s %8s\n", "----", "-----", "-----");
+    cur = alpha_inorder_first(p->alpha_tree);
+    while (cur != &ALPHA_NIL) {
+        double freq = 0.0;
+        if (total > 0) {
+            freq = 100.0 * cur->rep / total;
+        }
+        printf("  %-20s %6d %7.2f%%\n", cur->word, cur->rep, freq);
+        cur = alpha_inorder_next(cur);
     }
     printf("  %-20s %6d %8s\n", "TOTAL", total, "100.00%%");
 }
 
-void petal_print_stats(PetalNode* petale) {
-    if (petale->alpha_tree->root == &ALPHA_NIL) { printf("  Petale vide.\n"); return; }
-    int    total_mots    = petal_word_count(petale);
-    int    mots_uniques  = petal_unique_word_count(petale);
-    int    nb_phrases    = petal_sentence_count(petale);
-    char*  plus_frequent = petal_most_frequent_word(petale);
-    char*  moins_frequent= petal_least_frequent_word(petale);
-    double densite       = total_mots > 0 ? (100.0 * mots_uniques / total_mots) : 0.0;
-    printf("  %-25s %d\n",    "Mots total:",       total_mots);
-    printf("  %-25s %d\n",    "Mots uniques:",      mots_uniques);
-    printf("  %-25s %d\n",    "Phrases:",           nb_phrases);
-    printf("  %-25s %.2f%%\n","Densite lexicale:",  densite);
-    printf("  %-25s %s\n",    "Plus frequent:",     plus_frequent  ? plus_frequent  : "N/A");
-    printf("  %-25s %s\n",    "Moins frequent:",    moins_frequent ? moins_frequent : "N/A");
+void petal_print_stats(PetalNode* p)
+{
+    if (p->alpha_tree->root == &ALPHA_NIL) {
+        printf("  Empty petal.\n");
+        return;
+    }
+    int total_words = petal_word_count(p);
+    int unique_words = petal_unique_word_count(p);
+    char* most = petal_most_frequent_word(p);
+    char* least = petal_least_frequent_word(p);
+    double density = 0.0;
+    if (total_words > 0) {
+        density = 100.0 * unique_words / total_words;
+    }
+    printf("  %-25s %d\n", "Total words:", total_words);
+    printf("  %-25s %d\n", "Unique words:", unique_words);
+    printf("  %-25s %.2f%%\n", "Lexical density:", density);
+    if (most == NULL) {
+        printf("  %-25s %s\n", "Most frequent:", "N/A");
+    }
+    else {
+        printf("  %-25s %s\n", "Most frequent:", most);
+    }
+    if (least == NULL) {
+        printf("  %-25s %s\n", "Least frequent:", "N/A");
+    }
+    else {
+        printf("  %-25s %s\n", "Least frequent:", least);
+    }
 }
 
-void rose_find_petals_with_word(Rose* rose, const char* mot) {
-    if (!rose->petals) { printf("  Rose vide.\n"); return; }
-    int        trouve  = 0;
-    PetalNode* courant = rose->petals;
-    int        index   = 0;
+void rose_find_petals_with_word(Rose* rose, char* word)
+{
+    if (rose->petals == NULL) {
+        printf("  Empty rose.\n");
+        return;
+    }
+    int found = 0;
+    PetalNode* cur = rose->petals;
+    int idx = 0;
     do {
-        AlphaRBTNode* noeud = courant->alpha_tree->root;
-        while (noeud != &ALPHA_NIL) {
-            int comparaison = strcmp(mot, noeud->word);
-            if      (comparaison == 0) break;
-            else if (comparaison  < 0) noeud = noeud->left;
-            else                       noeud = noeud->right;
+        AlphaRBTNode* node = cur->alpha_tree->root;
+        while (node != &ALPHA_NIL) {
+            int cmp = strcmp(word, node->word);
+            if (cmp == 0) {
+                break;
+            }
+            if (cmp < 0) {
+                node = node->left;
+            }
+            else {
+                node = node->right;
+            }
         }
-        if (noeud != &ALPHA_NIL) {
-            trouve = 1;
-            printf("  Paragraphe %d (x%d) | positions: ", index, noeud->rep);
-            poslist_print(noeud->pos_list);
+        if (node != &ALPHA_NIL) {
+            found = 1;
+            printf("  Paragraph %d (x%d) | positions: ", idx, node->rep);
+            poslist_print(node->pos_list);
             printf("\n");
         }
-        courant = courant->next;
-        index++;
-    } while (courant != rose->petals);
-    if (!trouve) printf("  Mot '%s' introuvable dans cette rose.\n", mot);
+        cur = cur->next;
+        idx = idx + 1;
+    } while (cur != rose->petals);
+    if (found == 0) {
+        printf("  Word '%s' not found in this rose.\n", word);
+    }
 }
 
-/* ============================================================
- *  OPERATIONS ENSEMBLISTES — MOTS (multiset)
- * ============================================================ */
-PetalNode* petal_union(PetalNode* a, PetalNode* b) {
-    PetalNode*    resultat = allocatePetalNode();
-    AlphaRBTNode* courant_a = alpha_inorder_first(a->alpha_tree);
-    AlphaRBTNode* courant_b = alpha_inorder_first(b->alpha_tree);
-    AlphaRBTNode* nouveau   = NULL;
-    while (courant_a != &ALPHA_NIL && courant_b != &ALPHA_NIL) {
-        int comparaison = strcmp(courant_a->word, courant_b->word);
-        if (comparaison < 0) {
-            nouveau      = Insert_AlphaRBT(resultat->alpha_tree, courant_a->word);
-            nouveau->rep = courant_a->rep;
-            courant_a    = alpha_inorder_next(courant_a);
-        } else if (comparaison > 0) {
-            nouveau      = Insert_AlphaRBT(resultat->alpha_tree, courant_b->word);
-            nouveau->rep = courant_b->rep;
-            courant_b    = alpha_inorder_next(courant_b);
-        } else {
-            nouveau      = Insert_AlphaRBT(resultat->alpha_tree, courant_a->word);
-            nouveau->rep = (courant_a->rep > courant_b->rep) ? courant_a->rep : courant_b->rep;
-            courant_a    = alpha_inorder_next(courant_a);
-            courant_b    = alpha_inorder_next(courant_b);
+PetalNode* petal_union(PetalNode* a, PetalNode* b)
+{
+    PetalNode* res = allocate_petal();
+    AlphaRBTNode* ca = alpha_inorder_first(a->alpha_tree);
+    AlphaRBTNode* cb = alpha_inorder_first(b->alpha_tree);
+    AlphaRBTNode* nn = NULL;
+    while (ca != &ALPHA_NIL && cb != &ALPHA_NIL) {
+        int cmp = strcmp(ca->word, cb->word);
+        if (cmp < 0) {
+            nn = insert_alpha(res->alpha_tree, ca->word);
+            nn->rep = ca->rep;
+            ca = alpha_inorder_next(ca);
         }
-    }
-    while (courant_a != &ALPHA_NIL) {
-        nouveau      = Insert_AlphaRBT(resultat->alpha_tree, courant_a->word);
-        nouveau->rep = courant_a->rep;
-        courant_a    = alpha_inorder_next(courant_a);
-    }
-    while (courant_b != &ALPHA_NIL) {
-        nouveau      = Insert_AlphaRBT(resultat->alpha_tree, courant_b->word);
-        nouveau->rep = courant_b->rep;
-        courant_b    = alpha_inorder_next(courant_b);
-    }
-    return resultat;
-}
-
-PetalNode* petal_intersection(PetalNode* a, PetalNode* b) {
-    PetalNode*    resultat = allocatePetalNode();
-    AlphaRBTNode* courant_a = alpha_inorder_first(a->alpha_tree);
-    AlphaRBTNode* courant_b = alpha_inorder_first(b->alpha_tree);
-    while (courant_a != &ALPHA_NIL && courant_b != &ALPHA_NIL) {
-        int comparaison = strcmp(courant_a->word, courant_b->word);
-        if      (comparaison < 0) courant_a = alpha_inorder_next(courant_a);
-        else if (comparaison > 0) courant_b = alpha_inorder_next(courant_b);
+        else if (cmp > 0) {
+            nn = insert_alpha(res->alpha_tree, cb->word);
+            nn->rep = cb->rep;
+            cb = alpha_inorder_next(cb);
+        }
         else {
-            AlphaRBTNode* nouveau = Insert_AlphaRBT(resultat->alpha_tree, courant_a->word);
-            nouveau->rep = (courant_a->rep < courant_b->rep) ? courant_a->rep : courant_b->rep;
-            courant_a    = alpha_inorder_next(courant_a);
-            courant_b    = alpha_inorder_next(courant_b);
-        }
-    }
-    return resultat;
-}
-
-PetalNode* petal_difference(PetalNode* a, PetalNode* b) {
-    PetalNode*    resultat  = allocatePetalNode();
-    AlphaRBTNode* courant_a = alpha_inorder_first(a->alpha_tree);
-    AlphaRBTNode* courant_b = alpha_inorder_first(b->alpha_tree);
-    AlphaRBTNode* nouveau   = NULL;
-    while (courant_a != &ALPHA_NIL && courant_b != &ALPHA_NIL) {
-        int comparaison = strcmp(courant_a->word, courant_b->word);
-        if (comparaison < 0) {
-            nouveau      = Insert_AlphaRBT(resultat->alpha_tree, courant_a->word);
-            nouveau->rep = courant_a->rep;
-            courant_a    = alpha_inorder_next(courant_a);
-        } else if (comparaison > 0) {
-            courant_b = alpha_inorder_next(courant_b);
-        } else {
-            if (courant_a->rep > courant_b->rep) {
-                nouveau      = Insert_AlphaRBT(resultat->alpha_tree, courant_a->word);
-                nouveau->rep = courant_a->rep - courant_b->rep;
+            nn = insert_alpha(res->alpha_tree, ca->word);
+            if (ca->rep > cb->rep) {
+                nn->rep = ca->rep;
             }
-            courant_a = alpha_inorder_next(courant_a);
-            courant_b = alpha_inorder_next(courant_b);
+            else {
+                nn->rep = cb->rep;
+            }
+            ca = alpha_inorder_next(ca);
+            cb = alpha_inorder_next(cb);
         }
     }
-    while (courant_a != &ALPHA_NIL) {
-        nouveau      = Insert_AlphaRBT(resultat->alpha_tree, courant_a->word);
-        nouveau->rep = courant_a->rep;
-        courant_a    = alpha_inorder_next(courant_a);
+    while (ca != &ALPHA_NIL) {
+        nn = insert_alpha(res->alpha_tree, ca->word);
+        nn->rep = ca->rep;
+        ca = alpha_inorder_next(ca);
     }
-    return resultat;
+    while (cb != &ALPHA_NIL) {
+        nn = insert_alpha(res->alpha_tree, cb->word);
+        nn->rep = cb->rep;
+        cb = alpha_inorder_next(cb);
+    }
+    return res;
 }
 
-PetalNode* petal_symmetric_difference(PetalNode* a, PetalNode* b) {
-    PetalNode*    resultat  = allocatePetalNode();
-    AlphaRBTNode* courant_a = alpha_inorder_first(a->alpha_tree);
-    AlphaRBTNode* courant_b = alpha_inorder_first(b->alpha_tree);
-    while (courant_a != &ALPHA_NIL && courant_b != &ALPHA_NIL) {
-        int comparaison = strcmp(courant_a->word, courant_b->word);
-        if (comparaison < 0) {
-            Insert_AlphaRBT(resultat->alpha_tree, courant_a->word);
-            courant_a = alpha_inorder_next(courant_a);
-        } else if (comparaison > 0) {
-            Insert_AlphaRBT(resultat->alpha_tree, courant_b->word);
-            courant_b = alpha_inorder_next(courant_b);
-        } else {
-            courant_a = alpha_inorder_next(courant_a);
-            courant_b = alpha_inorder_next(courant_b);
+PetalNode* petal_intersection(PetalNode* a, PetalNode* b)
+{
+    PetalNode* res = allocate_petal();
+    AlphaRBTNode* ca = alpha_inorder_first(a->alpha_tree);
+    AlphaRBTNode* cb = alpha_inorder_first(b->alpha_tree);
+    while (ca != &ALPHA_NIL && cb != &ALPHA_NIL) {
+        int cmp = strcmp(ca->word, cb->word);
+        if (cmp < 0) {
+            ca = alpha_inorder_next(ca);
+        }
+        else if (cmp > 0) {
+            cb = alpha_inorder_next(cb);
+        }
+        else {
+            AlphaRBTNode* nn = insert_alpha(res->alpha_tree, ca->word);
+            if (ca->rep < cb->rep) {
+                nn->rep = ca->rep;
+            }
+            else {
+                nn->rep = cb->rep;
+            }
+            ca = alpha_inorder_next(ca);
+            cb = alpha_inorder_next(cb);
         }
     }
-    while (courant_a != &ALPHA_NIL) { Insert_AlphaRBT(resultat->alpha_tree, courant_a->word); courant_a = alpha_inorder_next(courant_a); }
-    while (courant_b != &ALPHA_NIL) { Insert_AlphaRBT(resultat->alpha_tree, courant_b->word); courant_b = alpha_inorder_next(courant_b); }
-    return resultat;
+    return res;
 }
 
-int petal_is_subset_of(PetalNode* a, PetalNode* b) {
-    AlphaRBTNode* courant_a = alpha_inorder_first(a->alpha_tree);
-    AlphaRBTNode* courant_b = alpha_inorder_first(b->alpha_tree);
-    while (courant_a != &ALPHA_NIL && courant_b != &ALPHA_NIL) {
-        int comparaison = strcmp(courant_a->word, courant_b->word);
-        if      (comparaison == 0) { courant_a = alpha_inorder_next(courant_a); courant_b = alpha_inorder_next(courant_b); }
-        else if (comparaison  > 0) courant_b = alpha_inorder_next(courant_b);
-        else return 0;
-    }
-    if (courant_a == &ALPHA_NIL) return 1;
-    return 0;
-}
-
-int petal_is_identical(PetalNode* a, PetalNode* b) {
-    AlphaRBTNode* courant_a = alpha_inorder_first(a->alpha_tree);
-    AlphaRBTNode* courant_b = alpha_inorder_first(b->alpha_tree);
-    while (courant_a != &ALPHA_NIL && courant_b != &ALPHA_NIL) {
-        if (strcmp(courant_a->word, courant_b->word) != 0) return 0;
-        courant_a = alpha_inorder_next(courant_a);
-        courant_b = alpha_inorder_next(courant_b);
-    }
-    if (courant_a == &ALPHA_NIL && courant_b == &ALPHA_NIL) return 1;
-    return 0;
-}
-
-/* ============================================================
- *  OPERATIONS ENSEMBLISTES — PHRASES (hash table)
- * ============================================================ */
-#define TAILLE_TABLE  1024
-#define BASE_HASH     31
-#define MOD_HASH      1000000007
-
-static unsigned int hash_mot(const char* mot) {
-    unsigned int h = 0;
-    while (*mot) { h = h * BASE_HASH + (unsigned char)(*mot); mot++; }
-    return h;
-}
-
-static unsigned int hash_phrase(PosRBTNode* debut) {
-    unsigned int h    = 0;
-    unsigned int base = 1;
-    PosRBTNode*  courant = debut;
-    while (courant != &POS_NIL && (courant == debut || !courant->sent_flag)) {
-        h    = (h + hash_mot(courant->word_ref->word) * base) % MOD_HASH;
-        base = (base * BASE_HASH) % MOD_HASH;
-        courant = pos_inorder_next(courant);
-    }
-    return h;
-}
-
-static int comparer_phrases(PosRBTNode* phrase1, PosRBTNode* phrase2) {
-    PosRBTNode* courant1 = phrase1;
-    PosRBTNode* courant2 = phrase2;
-    while (1) {
-        int fin1 = (courant1 == &POS_NIL || (courant1 != phrase1 && courant1->sent_flag));
-        int fin2 = (courant2 == &POS_NIL || (courant2 != phrase2 && courant2->sent_flag));
-        if (fin1 && fin2) return 1;
-        if (fin1 || fin2) return 0;
-        if (strcmp(courant1->word_ref->word, courant2->word_ref->word) != 0) return 0;
-        courant1 = pos_inorder_next(courant1);
-        courant2 = pos_inorder_next(courant2);
-    }
-}
-
-static SentenceEntry** construire_table_phrases(PetalNode* petale) {
-    SentenceEntry** table = calloc(TAILLE_TABLE, sizeof(SentenceEntry*));
-    if (!table) return NULL;
-    PosRBTNode* courant = pos_inorder_first(petale->pos_tree);
-    while (courant != &POS_NIL) {
-        if (courant->sent_flag) {
-            unsigned int    h      = hash_phrase(courant);
-            int             slot   = h % TAILLE_TABLE;
-            SentenceEntry*  entree = malloc(sizeof(SentenceEntry));
-            entree->hash  = h;
-            entree->start = courant;
-            entree->next  = table[slot];
-            table[slot]   = entree;
+PetalNode* petal_difference(PetalNode* a, PetalNode* b)
+{
+    PetalNode* res = allocate_petal();
+    AlphaRBTNode* ca = alpha_inorder_first(a->alpha_tree);
+    AlphaRBTNode* cb = alpha_inorder_first(b->alpha_tree);
+    AlphaRBTNode* nn = NULL;
+    while (ca != &ALPHA_NIL && cb != &ALPHA_NIL) {
+        int cmp = strcmp(ca->word, cb->word);
+        if (cmp < 0) {
+            nn = insert_alpha(res->alpha_tree, ca->word);
+            nn->rep = ca->rep;
+            ca = alpha_inorder_next(ca);
         }
-        courant = pos_inorder_next(courant);
-    }
-    return table;
-}
-
-static void liberer_table_phrases(SentenceEntry** table) {
-    for (int i = 0; i < TAILLE_TABLE; i++) {
-        SentenceEntry* courant = table[i];
-        while (courant) {
-            SentenceEntry* temporaire = courant;
-            courant = courant->next;
-            free(temporaire);
+        else if (cmp > 0) {
+            cb = alpha_inorder_next(cb);
+        }
+        else {
+            if (ca->rep > cb->rep) {
+                nn = insert_alpha(res->alpha_tree, ca->word);
+                nn->rep = ca->rep - cb->rep;
+            }
+            ca = alpha_inorder_next(ca);
+            cb = alpha_inorder_next(cb);
         }
     }
-    free(table);
+    while (ca != &ALPHA_NIL) {
+        nn = insert_alpha(res->alpha_tree, ca->word);
+        nn->rep = ca->rep;
+        ca = alpha_inorder_next(ca);
+    }
+    return res;
 }
 
-static int phrase_dans_table(SentenceEntry** table, PosRBTNode* noeud) {
-    unsigned int   h      = hash_phrase(noeud);
-    SentenceEntry* entree = table[h % TAILLE_TABLE];
-    while (entree) {
-        if (entree->hash == h && comparer_phrases(noeud, entree->start)) return 1;
-        entree = entree->next;
+PetalNode* petal_symmetric_difference(PetalNode* a, PetalNode* b)
+{
+    PetalNode* res = allocate_petal();
+    AlphaRBTNode* ca = alpha_inorder_first(a->alpha_tree);
+    AlphaRBTNode* cb = alpha_inorder_first(b->alpha_tree);
+    while (ca != &ALPHA_NIL && cb != &ALPHA_NIL) {
+        int cmp = strcmp(ca->word, cb->word);
+        if (cmp < 0) {
+            insert_alpha(res->alpha_tree, ca->word);
+            ca = alpha_inorder_next(ca);
+        }
+        else if (cmp > 0) {
+            insert_alpha(res->alpha_tree, cb->word);
+            cb = alpha_inorder_next(cb);
+        }
+        else {
+            ca = alpha_inorder_next(ca);
+            cb = alpha_inorder_next(cb);
+        }
     }
-    return 0;
+    while (ca != &ALPHA_NIL) {
+        insert_alpha(res->alpha_tree, ca->word);
+        ca = alpha_inorder_next(ca);
+    }
+    while (cb != &ALPHA_NIL) {
+        insert_alpha(res->alpha_tree, cb->word);
+        cb = alpha_inorder_next(cb);
+    }
+    return res;
 }
 
-static void inserer_phrase_dans_petale(PetalNode* resultat, PosRBTNode* debut) {
-    PosRBTNode* courant = debut;
-    while (courant != &POS_NIL && (courant == debut || !courant->sent_flag)) {
-        Insert_word(resultat, courant->word_ref->word, courant->sent_flag);
-        courant = pos_inorder_next(courant);
-    }
-}
-
-PetalNode* petal_sentence_intersection(PetalNode* P1, PetalNode* P2) {
-    PetalNode*      resultat = allocatePetalNode();
-    SentenceEntry** table    = construire_table_phrases(P2);
-    if (!table) return resultat;
-    PosRBTNode* courant = pos_inorder_first(P1->pos_tree);
-    while (courant != &POS_NIL) {
-        if (courant->sent_flag && phrase_dans_table(table, courant))
-            inserer_phrase_dans_petale(resultat, courant);
-        courant = pos_inorder_next(courant);
-    }
-    liberer_table_phrases(table);
-    return resultat;
-}
-
-PetalNode* petal_sentence_difference(PetalNode* P1, PetalNode* P2) {
-    PetalNode*      resultat = allocatePetalNode();
-    SentenceEntry** table    = construire_table_phrases(P2);
-    if (!table) return resultat;
-    PosRBTNode* courant = pos_inorder_first(P1->pos_tree);
-    while (courant != &POS_NIL) {
-        if (courant->sent_flag && !phrase_dans_table(table, courant))
-            inserer_phrase_dans_petale(resultat, courant);
-        courant = pos_inorder_next(courant);
-    }
-    liberer_table_phrases(table);
-    return resultat;
-}
-
-PetalNode* petal_sentence_union(PetalNode* P1, PetalNode* P2) {
-    PetalNode* resultat = allocatePetalNode();
-    PosRBTNode* courant = pos_inorder_first(P1->pos_tree);
-    while (courant != &POS_NIL) {
-        if (courant->sent_flag) inserer_phrase_dans_petale(resultat, courant);
-        courant = pos_inorder_next(courant);
-    }
-    SentenceEntry** table = construire_table_phrases(P1);
-    if (!table) return resultat;
-    courant = pos_inorder_first(P2->pos_tree);
-    while (courant != &POS_NIL) {
-        if (courant->sent_flag && !phrase_dans_table(table, courant))
-            inserer_phrase_dans_petale(resultat, courant);
-        courant = pos_inorder_next(courant);
-    }
-    liberer_table_phrases(table);
-    return resultat;
-}
-
-PetalNode* petal_sentence_symmetric_difference(PetalNode* P1, PetalNode* P2) {
-    PetalNode* resultat = allocatePetalNode();
-    SentenceEntry** table2 = construire_table_phrases(P2);
-    if (!table2) return resultat;
-    PosRBTNode* courant = pos_inorder_first(P1->pos_tree);
-    while (courant != &POS_NIL) {
-        if (courant->sent_flag && !phrase_dans_table(table2, courant))
-            inserer_phrase_dans_petale(resultat, courant);
-        courant = pos_inorder_next(courant);
-    }
-    liberer_table_phrases(table2);
-    SentenceEntry** table1 = construire_table_phrases(P1);
-    if (!table1) return resultat;
-    courant = pos_inorder_first(P2->pos_tree);
-    while (courant != &POS_NIL) {
-        if (courant->sent_flag && !phrase_dans_table(table1, courant))
-            inserer_phrase_dans_petale(resultat, courant);
-        courant = pos_inorder_next(courant);
-    }
-    liberer_table_phrases(table1);
-    return resultat;
-}
-
-int petal_sentence_is_subset(PetalNode* P1, PetalNode* P2) {
-    SentenceEntry** table = construire_table_phrases(P2);
-    if (!table) return 0;
-    PosRBTNode* courant = pos_inorder_first(P1->pos_tree);
-    while (courant != &POS_NIL) {
-        if (courant->sent_flag && !phrase_dans_table(table, courant)) {
-            liberer_table_phrases(table);
+int petal_is_subset_of(PetalNode* a, PetalNode* b)
+{
+    AlphaRBTNode* ca = alpha_inorder_first(a->alpha_tree);
+    AlphaRBTNode* cb = alpha_inorder_first(b->alpha_tree);
+    while (ca != &ALPHA_NIL && cb != &ALPHA_NIL) {
+        int cmp = strcmp(ca->word, cb->word);
+        if (cmp == 0) {
+            ca = alpha_inorder_next(ca);
+            cb = alpha_inorder_next(cb);
+        }
+        else if (cmp > 0) {
+            cb = alpha_inorder_next(cb);
+        }
+        else {
             return 0;
         }
-        courant = pos_inorder_next(courant);
     }
-    liberer_table_phrases(table);
+    if (ca == &ALPHA_NIL) {
+        return 1;
+    }
+    return 0;
+}
+
+int petal_is_identical(PetalNode* a, PetalNode* b)
+{
+    AlphaRBTNode* ca = alpha_inorder_first(a->alpha_tree);
+    AlphaRBTNode* cb = alpha_inorder_first(b->alpha_tree);
+    while (ca != &ALPHA_NIL && cb != &ALPHA_NIL) {
+        if (strcmp(ca->word, cb->word) != 0) {
+            return 0;
+        }
+        ca = alpha_inorder_next(ca);
+        cb = alpha_inorder_next(cb);
+    }
+    if (ca == &ALPHA_NIL && cb == &ALPHA_NIL) {
+        return 1;
+    }
+    return 0;
+}
+
+int is_delimiter(char c)
+{
+    if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
+        return 1;
+    }
+    if (c == '.' || c == ',' || c == '?' || c == '!') {
+        return 1;
+    }
+    if (c == '"' || c == '\'' || c == ';' || c == ':' || c == '-') {
+        return 1;
+    }
+    return 0;
+}
+
+int is_paragraph_break(char* s, int i)
+{
+    if (s[i] == '\n' && s[i + 1] == '\n') {
+        return 1;
+    }
+    return 0;
+}
+
+int is_end_of_string(char* s, int i)
+{
+    if (s[i] == '\0') {
+        return 1;
+    }
+    return 0;
+}
+
+int skip_delimiters(char* s, int i, int* new_para)
+{
+    while (s[i] != '\0' && is_delimiter(s[i]) == 1) {
+        if (is_paragraph_break(s, i) == 1) {
+            *new_para = 1;
+        }
+        i = i + 1;
+    }
+    return i;
+}
+
+int collect_word(char* s, int i)
+{
+    while (s[i] != '\0' && is_delimiter(s[i]) == 0) {
+        i = i + 1;
+    }
+    return i;
+}
+
+void detect_paragraph_end(char* s, int i, char** next, int* new_para)
+{
+    if (is_end_of_string(s, i) == 1) {
+        *new_para = 1;
+        *next = NULL;
+        return;
+    }
+    if (is_paragraph_break(s, i) == 1) {
+        *new_para = 1;
+    }
+    s[i] = '\0';
+    *next = s + i + 1;
+}
+
+char* next_word(char** str, int* new_para)
+{
+    if (str == NULL || *str == NULL) {
+        return NULL;
+    }
+    if (**str == '\0') {
+        return NULL;
+    }
+    char* s = *str;
+    int i = 0;
+    i = skip_delimiters(s, i, new_para);
+    if (is_end_of_string(s, i) == 1) {
+        *str = NULL;
+        return NULL;
+    }
+    char* start = s + i;
+    i = collect_word(s, i);
+    detect_paragraph_end(s, i, str, new_para);
+    return start;
+}
+
+Rose* allocate_rose()
+{
+    Rose* r = malloc(sizeof(Rose));
+    r->petals = NULL;
+    r->size = 0;
+    r->name[0] = '\0';
+    return r;
+}
+
+void append_petal(Rose* r)
+{
+    PetalNode* p = allocate_petal();
+    if (r->petals == NULL) {
+        r->petals = p;
+        p->next = p;
+        p->prev = p;
+    }
+    else {
+        PetalNode* tail = r->petals->prev;
+        tail->next = p;
+        p->prev = tail;
+        p->next = r->petals;
+        r->petals->prev = p;
+    }
+    r->size = r->size + 1;
+}
+
+void rose_free(Rose* r)
+{
+    if (r == NULL) {
+        return;
+    }
+    if (r->petals == NULL) {
+        free(r);
+        return;
+    }
+    PetalNode* cur = r->petals;
+    PetalNode* nx;
+    do {
+        nx = cur->next;
+        petal_free(cur);
+        cur = nx;
+    } while (cur != r->petals);
+    free(r);
+}
+
+PetalNode* rose_get_petal(Rose* r, int index)
+{
+    if (r->petals == NULL) {
+        return NULL;
+    }
+    if (index < 0 || index >= r->size) {
+        return NULL;
+    }
+    PetalNode* cur = r->petals;
+    int j = 0;
+    while (j < index) {
+        cur = cur->next;
+        j = j + 1;
+    }
+    return cur;
+}
+
+int line_is_blank(char* line)
+{
+    int i = 0;
+    while (line[i] != '\0') {
+        char c = line[i];
+        if (c != ' ' && c != '\t' && c != '\n' && c != '\r') {
+            return 0;
+        }
+        i = i + 1;
+    }
     return 1;
 }
 
-int petal_sentence_is_identical(PetalNode* P1, PetalNode* P2) {
-    if (petal_sentence_count(P1) != petal_sentence_count(P2)) return 0;
-    return petal_sentence_is_subset(P1, P2);
-}
-
-/* ============================================================
- *  LAYER 3 — Traitement du texte
- * ============================================================ */
-int est_delimiteur(char caractere) {
-    return (caractere == ' '  || caractere == '\t' || caractere == '\n' ||
-            caractere == '.'  || caractere == ','  || caractere == '?'  ||
-            caractere == '!'  || caractere == '"'  || caractere == '\'' ||
-            caractere == ';'  || caractere == ':'  || caractere == '-');
-}
-
-int est_fin_de_phrase(char caractere) {
-    return (caractere == '.' || caractere == '!' || caractere == '?');
-}
-
-int est_saut_de_paragraphe(char* chaine, int i) {
-    return (chaine[i] == '\n' && chaine[i + 1] == '\n');
-}
-
-int est_fin_de_chaine(char* chaine, int i) {
-    return (chaine[i] == '\0');
-}
-
-int sauter_delimiteurs(char* chaine, int i, int* nouveau_para, int* debut_phrase) {
-    while (chaine[i] != '\0' && est_delimiteur(chaine[i])) {
-        if (est_fin_de_phrase(chaine[i]))      *debut_phrase  = 1;
-        if (est_saut_de_paragraphe(chaine, i)) *nouveau_para  = 1;
-        i++;
+Rose* load_file(char* filename)
+{
+    FILE* f = fopen(filename, "r");
+    if (f == NULL) {
+        printf("Cannot open %s\n", filename);
+        return NULL;
     }
-    return i;
-}
+    Rose* rose = allocate_rose();
+    strncpy(rose->name, filename, 255);
+    rose->name[255] = '\0';
 
-int collecter_mot(char* chaine, int i) {
-    while (chaine[i] != '\0' && !est_delimiteur(chaine[i])) i++;
-    return i;
-}
+    char line[1024];
+    int blank_seen = 1;
 
-void detecter_nouveau_para(char* chaine, int i, char** suivant, int* nouveau_para) {
-    if (est_fin_de_chaine(chaine, i)) {
-        *nouveau_para = 1;
-        *suivant      = NULL;
-    } else {
-        *nouveau_para = est_saut_de_paragraphe(chaine, i) ? 1 : 0;
-        chaine[i]     = '\0';
-        *suivant      = chaine + i + 1;
+    while (fgets(line, sizeof(line), f) != NULL) {
+        if (line_is_blank(line) == 1) {
+            blank_seen = 1;
+            continue;
+        }
+        if (blank_seen == 1) {
+            append_petal(rose);
+            blank_seen = 0;
+        }
+        char* ptr = line;
+        int dummy_np = 0;
+        char* w = next_word(&ptr, &dummy_np);
+        while (w != NULL) {
+            int j = 0;
+            while (w[j] != '\0') {
+                if (w[j] >= 'A' && w[j] <= 'Z') {
+                    w[j] = w[j] + ('a' - 'A');
+                }
+                j = j + 1;
+            }
+            insert_word(rose->petals->prev, w);
+            w = next_word(&ptr, &dummy_np);
+        }
     }
-}
-
-char* mot_suivant(char** chaine, int* nouveau_para, int* debut_phrase) {
-    if (!chaine || !*chaine || !**chaine) return NULL;
-    char* courant = *chaine;
-    int   i       = 0;
-    *debut_phrase  = 0;
-    i = sauter_delimiteurs(courant, i, nouveau_para, debut_phrase);
-    if (est_fin_de_chaine(courant, i)) { *chaine = NULL; return NULL; }
-    char* debut = courant + i;
-    i = collecter_mot(courant, i);
-    detecter_nouveau_para(courant, i, chaine, nouveau_para);
-    return debut;
-}
-
-/* ============================================================
- *  LAYER 4 — Rose
- * ============================================================ */
-Rose* AllocateRose() {
-    Rose* rose    = malloc(sizeof(Rose));
-    rose->petals  = NULL;
-    rose->size    = 0;
-    rose->nom[0]  = '\0';
+    fclose(f);
     return rose;
 }
 
-void ajouter_petale(Rose* rose) {
-    PetalNode* petale = allocatePetalNode();
-    if (rose->petals == NULL) {
-        rose->petals  = petale;
-        petale->next  = petale;
-        petale->prev  = petale;
-    } else {
-        PetalNode* queue    = rose->petals->prev;
-        queue->next         = petale;
-        petale->prev        = queue;
-        petale->next        = rose->petals;
-        rose->petals->prev  = petale;
+int rose_total_word_count(Rose* r)
+{
+    if (r->petals == NULL) {
+        return 0;
     }
-    rose->size++;
-}
-
-void rose_free(Rose* rose) {
-    if (!rose) return;
-    if (!rose->petals) { free(rose); return; }
-    PetalNode* courant  = rose->petals;
-    PetalNode* suivant  = NULL;
+    PetalNode* cur = r->petals;
+    int total = 0;
     do {
-        suivant = courant->next;
-        petal_free(courant);
-        courant = suivant;
-    } while (courant != rose->petals);
-    free(rose);
-}
-
-PetalNode* rose_get_petal(Rose* rose, int index) {
-    if (!rose->petals || index < 0 || index >= rose->size) return NULL;
-    PetalNode* courant = rose->petals;
-    for (int j = 0; j < index; j++) courant = courant->next;
-    return courant;
-}
-
-Rose* charger_fichier(const char* nom_fichier) {
-    FILE* fichier = fopen(nom_fichier, "r");
-    if (!fichier) { printf("Impossible d'ouvrir %s\n", nom_fichier); return NULL; }
-    Rose* rose          = AllocateRose();
-    strncpy(rose->nom, nom_fichier, 255);
-    char  ligne[1024];
-    int   nouveau_para  = 0;
-    int   ligne_vide    = 0;
-    int   debut_phrase  = 1;
-    ajouter_petale(rose);
-    while (fgets(ligne, sizeof(ligne), fichier)) {
-        if (ligne[0] == '\n' || ligne[0] == '\r') { ligne_vide = 1; continue; }
-        if (ligne_vide) {
-            ajouter_petale(rose);
-            ligne_vide   = 0;
-            debut_phrase = 1;
-        }
-        char* pointeur = ligne;
-        char* mot      = mot_suivant(&pointeur, &nouveau_para, &debut_phrase);
-        while (mot) {
-            Insert_word(rose->petals->prev, mot, debut_phrase);
-            debut_phrase = 0;
-            mot          = mot_suivant(&pointeur, &nouveau_para, &debut_phrase);
-        }
-    }
-    fclose(fichier);
-    return rose;
-}
-
-int rose_total_word_count(Rose* rose) {
-    if (!rose->petals) return 0;
-    PetalNode* courant = rose->petals;
-    int        total   = 0;
-    do { total += petal_word_count(courant); courant = courant->next; } while (courant != rose->petals);
+        total = total + petal_word_count(cur);
+        cur = cur->next;
+    } while (cur != r->petals);
     return total;
 }
